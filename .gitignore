@@ -1,0 +1,25 @@
+.build/
+build/
+DerivedData/
+.DS_Store
+*.xcuserstate
+xcuserdata/
+*.xcarchive/
+*.dSYM/
+*.ipa
+*.mobileprovision
+*.p12
+*.p8
+*.key
+.env
+.env.*
+!.env.example
+
+# Local design references, previews and development notes are not part of the iOS repository.
+DesignReference/
+Preview/
+Docs/
+graphify-out/
+AGENTS.md
+.graphifyignore
+README.md

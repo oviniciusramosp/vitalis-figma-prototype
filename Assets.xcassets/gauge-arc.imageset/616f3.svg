@@ -1,0 +1,12 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="249.695" height="193.397" viewBox="0 0 249.695 193.397" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Group 4">
+<path id="Ellipse 3" opacity="0.5" d="M232.404 187.896C243.076 169.411 248.695 148.442 248.695 127.098C248.695 105.753 243.076 84.784 232.404 66.2989C221.732 47.8137 206.381 32.4635 187.896 21.7911C169.411 11.1187 148.442 5.50012 127.098 5.50012C105.753 5.50013 84.7839 11.1187 66.2988 21.7911C47.8136 32.4635 32.4634 47.8137 21.791 66.2989C11.1186 84.7841 5.5 105.753 5.5 127.098C5.5 148.442 11.1186 169.411 21.791 187.896" stroke="white" stroke-width="2" stroke-linecap="round"/>
+<path id="Ellipse 4" d="M21.791 187.896C10.062 167.581 4.4596 144.307 5.65912 120.88C6.85864 97.4524 14.8089 74.8722 28.5515 55.8612C42.294 36.8502 61.2422 22.22 83.1116 13.7345C104.981 5.24892 128.838 3.27025 151.807 8.03699" stroke="url(#paint0_linear_0_247)" stroke-width="11" stroke-linecap="round"/>
+</g>
+<defs>
+<linearGradient id="paint0_linear_0_247" x1="219.514" y1="46.6689" x2="23.2771" y2="193.846" gradientUnits="userSpaceOnUse">
+<stop stop-color="white"/>
+<stop offset="1" stop-color="white" stop-opacity="0.5"/>
+</linearGradient>
+</defs>
+</svg>
