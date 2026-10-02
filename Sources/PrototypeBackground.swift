@@ -11,7 +11,7 @@ struct PrototypeBackground: View {
     @State private var isVisible = false
 
     var body: some View {
-        FigmaMeshSurface(motion: motion)
+        FigmaMeshSurface(motion: motion, theme: PrototypeTheme.selection)
             .ignoresSafeArea()
             .accessibilityHidden(true)
             .allowsHitTesting(false)
@@ -44,6 +44,7 @@ private enum BackgroundTexture {
 
 private struct FigmaMeshSurface: UIViewRepresentable {
     var motion: BackgroundMotion
+    var theme: PrototypeThemeChoice
 
     func makeCoordinator() -> MeshRenderer { MeshRenderer() }
 
@@ -55,9 +56,10 @@ private struct FigmaMeshSurface: UIViewRepresentable {
         view.framebufferOnly = false
         view.isOpaque = true
         view.clearColor = MTLClearColorMake(0.42, 0.42, 0.42, 1)
-        view.backgroundColor = UIColor(white: 0.42, alpha: 1)
+        view.backgroundColor = UIColor(PrototypeTheme.background)
         view.maximumCadenceChanged = { [weak motion] maximum in motion?.maximumFramesPerSecond = maximum }
         let renderer = context.coordinator
+        renderer.theme = theme
         motion.onOffsetChange = { [weak renderer, weak view] offset in
             renderer?.offset = offset
             view?.setNeedsDisplay()
@@ -68,6 +70,11 @@ private struct FigmaMeshSurface: UIViewRepresentable {
     }
 
     func updateUIView(_ view: MTKView, context: Context) {
+        if context.coordinator.theme != theme {
+            context.coordinator.theme = theme
+            view.backgroundColor = UIColor(PrototypeTheme.background)
+            view.setNeedsDisplay()
+        }
         if context.coordinator.offset != motion.offset {
             context.coordinator.offset = motion.offset
             view.setNeedsDisplay()
@@ -87,6 +94,7 @@ private final class MeshSurfaceView: MTKView {
 
 private final class MeshRenderer: NSObject, MTKViewDelegate {
     var offset: CGSize = .zero
+    var theme: PrototypeThemeChoice = .gray
     private static let preparationQueue = DispatchQueue(label: "vitalis.prototype.mesh.prepare", qos: .userInitiated)
     private static var sharedResources: Resources?
     private var resources: Resources?
@@ -217,7 +225,8 @@ private final class MeshRenderer: NSObject, MTKViewDelegate {
             Float(offset.height / max(view.bounds.height, 1)),
             BackgroundTexture.grainAmplitude, BackgroundTexture.grainSeed
         )
-        var dimensions = SIMD4<Float>(Float(size.width), Float(size.height), 0, 0)
+        // z switches only the final luminosity pass; the cached mesh and grain stay intact.
+        var dimensions = SIMD4<Float>(Float(size.width), Float(size.height), theme.meshIndex, 0)
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = drawable.texture
         pass.colorAttachments[0].loadAction = .dontCare
@@ -339,7 +348,11 @@ private final class MeshRenderer: NSObject, MTKViewDelegate {
         float3 rgb=clamp(float3(linearToSrgbChannel(color.r),linearToSrgbChannel(color.g),linearToSrgbChannel(color.b)),0.0,1.0);
         // Figma's white Color blend keeps backdrop luminosity, then white Screen at 30%.
         float luminosity=dot(rgb,float3(0.30,0.59,0.11));
-        float finalGray=clamp(luminosity*0.70+0.30+grain(pixel,uint(effects.w))*effects.z,0.0,1.0);
+        float baseGray=luminosity*0.70+0.30;
+        float grainStrength=1.0;
+        if (dimensions.z>1.5) { baseGray=0.79+luminosity*0.35; grainStrength=0.70; }
+        else if (dimensions.z>0.5) { baseGray=0.07+luminosity*0.42; grainStrength=0.55; }
+        float finalGray=clamp(baseGray+grain(pixel,uint(effects.w))*effects.z*grainStrength,0.0,1.0);
         return float4(finalGray,finalGray,finalGray,color.a);
     }
     """

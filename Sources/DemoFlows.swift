@@ -556,6 +556,7 @@ struct HealthView: View {
 struct MoreView: View {
     let onReset: () -> Void
 
+    @State private var appearance = PrototypeAppearance.shared
     @State private var confirmReset = false
     @State private var resetDone = false
 
@@ -576,7 +577,18 @@ struct MoreView: View {
                     }
                     .padding(.vertical, 14)
                 }
-                .listRowBackground(Color.white.opacity(0.045))
+                .listRowBackground(PrototypeTheme.listRow)
+
+                Section {
+                    ForEach(PrototypeThemeChoice.allCases) { theme in
+                        themeOption(theme)
+                    }
+                } header: {
+                    Text("Appearance")
+                } footer: {
+                    Text("Choose the appearance for the entire prototype.")
+                }
+                .listRowBackground(PrototypeTheme.listRow)
 
                 Section("About") {
                     LabeledContent("Version", value: "Prototype 1.0")
@@ -586,7 +598,7 @@ struct MoreView: View {
                         .foregroundStyle(PrototypeTheme.muted)
                         .padding(.vertical, 8)
                 }
-                .listRowBackground(Color.white.opacity(0.045))
+                .listRowBackground(PrototypeTheme.listRow)
 
                 Section {
                     Button("Reset demo session", systemImage: "arrow.counterclockwise") {
@@ -596,12 +608,13 @@ struct MoreView: View {
                 } footer: {
                     Text(resetDone ? "Demo check-ins have been reset." : "Clear the test and symptom report status to try the experience again.")
                 }
-                .listRowBackground(Color.white.opacity(0.045))
+                .listRowBackground(PrototypeTheme.listRow)
             }
             .scrollContentBackground(.hidden)
             .background(PrototypeTheme.background)
             .navigationTitle("More")
             .font(PrototypeFont.inter(15))
+            .accessibilityIdentifier("more-screen")
             .alert("Reset this demo session?", isPresented: $confirmReset) {
                 Button("Reset", role: .destructive) {
                     onReset()
@@ -613,6 +626,38 @@ struct MoreView: View {
             }
         }
         .tint(PrototypeTheme.accent)
+    }
+
+    private func themeOption(_ theme: PrototypeThemeChoice) -> some View {
+        let isSelected = appearance.selection == theme
+        let selectionTraits: AccessibilityTraits = isSelected ? .isSelected : []
+        return Button {
+            appearance.selection = theme
+        } label: {
+            themeOptionLabel(theme, isSelected: isSelected)
+        }
+        .accessibilityLabel("\(theme.title) theme")
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityAddTraits(selectionTraits)
+        .accessibilityIdentifier("theme-\(theme.rawValue)")
+    }
+
+    private func themeOptionLabel(_ theme: PrototypeThemeChoice, isSelected: Bool) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: theme.symbol)
+                .frame(width: 24)
+                .foregroundStyle(PrototypeTheme.muted)
+            Text(theme.title)
+                .foregroundStyle(PrototypeTheme.foreground)
+            Spacer()
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(PrototypeTheme.success)
+            }
+        }
+        .padding(.vertical, 5)
+        .contentShape(Rectangle())
     }
 }
 

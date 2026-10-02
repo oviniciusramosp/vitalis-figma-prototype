@@ -222,7 +222,7 @@ struct WidgetGalleryView: View {
             }
         }
         .tint(PrototypeTheme.success)
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(PrototypeTheme.colorScheme)
         .accessibilityIdentifier("widget-gallery")
     }
 

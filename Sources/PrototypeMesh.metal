@@ -82,6 +82,10 @@ fragment float4 resolveFragment(ResolveOutput input [[stage_in]],texture2d<float
     float3 rgb=clamp(float3(linearToSrgbChannel(color.r),linearToSrgbChannel(color.g),linearToSrgbChannel(color.b)),0.0,1.0);
     // Figma's white Color blend keeps backdrop luminosity, then white Screen at 30%.
     float luminosity=dot(rgb,float3(0.30,0.59,0.11));
-    float finalGray=clamp(luminosity*0.70+0.30+grain(pixel,uint(effects.w))*effects.z,0.0,1.0);
+    float baseGray=luminosity*0.70+0.30;
+    float grainStrength=1.0;
+    if (dimensions.z>1.5) { baseGray=0.79+luminosity*0.35; grainStrength=0.70; }
+    else if (dimensions.z>0.5) { baseGray=0.07+luminosity*0.42; grainStrength=0.55; }
+    float finalGray=clamp(baseGray+grain(pixel,uint(effects.w))*effects.z*grainStrength,0.0,1.0);
     return float4(finalGray,finalGray,finalGray,color.a);
 }

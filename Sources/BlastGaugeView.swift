@@ -132,6 +132,7 @@ struct BlastGaugeView: View {
     private var animatedArc: some View {
         ZStack(alignment: .topLeading) {
             Image("gauge-track")
+                .renderingMode(.template)
                 .resizable()
                 .scaledToFit()
                 .frame(width: 249.695, height: 193.397)

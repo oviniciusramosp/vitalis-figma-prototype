@@ -22,7 +22,6 @@ targets:
       properties:
         CFBundleDisplayName: Vitalis Prototype
         UILaunchScreen: {}
-        UIUserInterfaceStyle: Dark
         NSMotionUsageDescription: Tilting your iPhone gently moves the prototype background.
         CADisableMinimumFrameDurationOnPhone: true
         UISupportedInterfaceOrientations:

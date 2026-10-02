@@ -87,13 +87,13 @@ struct PrototypeDeviceDetailView: View {
 
                 Text(message)
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(PrototypeTheme.foreground)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("device-sync-status")
 
                 Text("Last synced: \(hasSynced ? "Just now" : device.initialLastSynced).")
                     .font(.body)
-                    .foregroundStyle(.white.opacity(0.75))
+                    .foregroundStyle(PrototypeTheme.muted)
                     .accessibilityIdentifier("device-last-synced")
 
                 if let batteryPercentage = device.batteryPercentage {
@@ -119,7 +119,7 @@ struct PrototypeDeviceDetailView: View {
         .padding(14)
         .frame(maxWidth: 302)
         .fixedSize(horizontal: false, vertical: true)
-        .glassEffect(.regular.tint(.black.opacity(0.6)), in: .rect(cornerRadius: 30))
+        .glassEffect(.regular.tint(PrototypeTheme.modalTint), in: .rect(cornerRadius: 30))
         .shadow(color: .black.opacity(0.25), radius: 18, y: 10)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("device-detail-\(device.rawValue)")
@@ -147,6 +147,7 @@ struct PrototypeDeviceDetailView: View {
                 .foregroundStyle(percentage > 50 ? PrototypeTheme.success : PrototypeTheme.accent)
                 .monospacedDigit()
         }
+        .foregroundStyle(PrototypeTheme.foreground)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Battery")
         .accessibilityValue("\(percentage) percent")
@@ -185,7 +186,7 @@ struct PrototypeDeviceDetailView: View {
                     .buttonStyle(.bordered)
                     .buttonBorderShape(.capsule)
                     .controlSize(.large)
-                    .tint(.white)
+                    .tint(PrototypeTheme.foreground)
                     .accessibilityIdentifier("device-ignore")
             }
         }

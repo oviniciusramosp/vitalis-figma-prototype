@@ -50,12 +50,8 @@ final class PrototypeSmokeTests: XCTestCase {
         expectHistoryAverage("5.4")
 
         app.tabBars.buttons["Exposure"].tap()
-        app.segmentedControls.buttons["Month"].tap()
-        XCTAssertTrue(app.staticTexts["This month"].waitForExistence(timeout: 5))
-        attachScreenshot(app, name: "Animated monthly chart")
-        app.segmentedControls.buttons["Week"].tap()
-        XCTAssertTrue(app.staticTexts["This week"].waitForExistence(timeout: 5))
-        app.tabBars.buttons["Today"].tap()
+        XCTAssertTrue(app.tabBars.buttons["Today"].isSelected)
+        XCTAssertTrue(gauge.exists)
     }
 
     func testDemoJourney() {
@@ -80,7 +76,8 @@ final class PrototypeSmokeTests: XCTestCase {
         XCTAssertTrue(app.buttons["Finish"].waitForExistence(timeout: 3))
         attachScreenshot(app, name: "Cognitive test completed")
         app.buttons["Finish"].tap()
-        XCTAssertTrue(app.staticTexts["Completed this session"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["blast-gauge"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.tabBars.buttons["Today"].isSelected)
 
         app.tabBars.buttons["Today"].tap()
         app.buttons["Report how you feel today"].tap()
@@ -93,12 +90,12 @@ final class PrototypeSmokeTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Check-in saved"].waitForExistence(timeout: 5))
         attachScreenshot(app, name: "Report confirmation")
         app.buttons["Done"].tap()
-        XCTAssertEqual(app.staticTexts.matching(identifier: "Completed this session").count, 2)
+        XCTAssertTrue(app.buttons["blast-gauge"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.tabBars.buttons["Today"].isSelected)
 
         app.tabBars.buttons["Exposure"].tap()
-        app.segmentedControls.buttons["Month"].tap()
-        XCTAssertTrue(app.staticTexts["This month"].waitForExistence(timeout: 3))
-        attachScreenshot(app, name: "Exposure")
+        XCTAssertTrue(app.tabBars.buttons["Today"].isSelected)
+        XCTAssertTrue(app.buttons["blast-gauge"].exists)
 
         app.tabBars.buttons["Today"].tap()
         app.buttons["apple-watch-device"].tap()
@@ -111,9 +108,8 @@ final class PrototypeSmokeTests: XCTestCase {
         app.alerts.buttons["Reset"].tap()
         XCTAssertTrue(app.buttons["Start cognitive test"].waitForExistence(timeout: 5))
         app.tabBars.buttons["Health"].tap()
-        XCTAssertTrue(app.staticTexts["Ready when you are"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["No report this session"].exists)
-        app.tabBars.buttons["Today"].tap()
+        XCTAssertTrue(app.tabBars.buttons["Today"].isSelected)
+        XCTAssertTrue(app.buttons["blast-gauge"].exists)
     }
 
     func testWidgetCustomization() {

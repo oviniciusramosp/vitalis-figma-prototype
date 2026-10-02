@@ -182,7 +182,7 @@ private struct MetricWidgetCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: size.height, alignment: .topLeading)
         .foregroundStyle(PrototypeTheme.foreground)
-        .background(Color.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 16))
+        .background(PrototypeTheme.surface, in: RoundedRectangle(cornerRadius: 16))
         .overlay {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(PrototypeTheme.foreground.opacity(0.24), lineWidth: 0.5)
@@ -279,9 +279,9 @@ private struct WidgetMetricIcon: View {
         Group {
             switch kind {
             case .blastExposure:
-                Image("exposure-card-icon").resizable().scaledToFit()
+                Image("exposure-card-icon").renderingMode(.template).resizable().scaledToFit()
             case .cognition:
-                Image("cognition").resizable().scaledToFit()
+                Image("cognition").renderingMode(.template).resizable().scaledToFit()
             case .sleep, .activity, .heart, .hrv, .respiration, .healthSummary:
                 Image(systemName: kind.symbol).resizable().scaledToFit()
             }
@@ -435,7 +435,7 @@ private struct HealthMetricCircle: View {
             .padding(7)
             .frame(width: 80, height: 80)
             .background {
-                Circle().fill(LinearGradient(colors: [Color.white.opacity(0.12), Color.black.opacity(0.25)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                Circle().fill(LinearGradient(colors: [PrototypeTheme.foreground.opacity(0.1), PrototypeTheme.surface], startPoint: .topLeading, endPoint: .bottomTrailing))
             }
             .overlay { Circle().stroke(PrototypeTheme.foreground.opacity(0.24), lineWidth: 0.5) }
             Text(data.kind == .blastExposure ? "Blast" : data.kind.title)

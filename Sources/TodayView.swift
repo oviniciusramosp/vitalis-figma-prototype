@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 struct TodayView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -12,7 +13,11 @@ struct TodayView: View {
     @State private var widgetLayout: PrototypeWidgetLayout
     @State private var showWidgetGallery = false
     @State private var showWidgetEditor = false
+    @State private var draggedWidgetID: UUID?
+    @State private var lastReorderTarget: String?
+    @State private var widgetDragLifecycle = WidgetDragLifecycle()
     @State private var scrollProgress: CGFloat = 0
+    @State private var actionsCollapsed = false
 
     // Keep the original color when SwiftUI bridges this image to the native menu.
     private static let removeWidgetIcon = UIImage(systemName: "minus.circle")?
@@ -112,11 +117,14 @@ struct TodayView: View {
                             .scaleEffect(verticalScale)
                             .frame(height: 240 * verticalScale)
                             .frame(maxWidth: .infinity)
+                            .overlay { widgetBlastDropTarget }
+                            .zIndex(1)
 
                         Color.clear.frame(height: 20 * verticalScale)
 
                         exposureNotice
                             .frame(height: 68)
+                            .clipped()
 
                         Color.clear.frame(height: 20 * verticalScale)
 
@@ -126,43 +134,55 @@ struct TodayView: View {
                                 .frame(height: widgetAreaHeight(widgetLayout.belowBlastWidgets))
                         }
 
+                        widgetEditingControls
+                            .padding(.horizontal, 20)
+                            .padding(.top, 16)
+
                         Color.clear.frame(height: 18 + 15 * verticalScale)
                     }
                     .frame(width: geometry.size.width, alignment: .top)
                     // Keep the collapse gesture available even with a single widget row.
-                    .frame(minHeight: geometry.size.height + 80, alignment: .top)
+                    .frame(minHeight: geometry.size.height + 120, alignment: .top)
                 }
                 .accessibilityIdentifier("today-dashboard-scroll")
                 .overlay(alignment: .top) {
                     header
                         .frame(height: 54)
-                        .background {
-                            PrototypeBackdropBlur(progress: scrollProgress)
-                                .overlay(Color.black.opacity(0.08 * scrollProgress))
-                                .ignoresSafeArea(edges: .top)
+                        .background(alignment: .top) {
+                            PrototypeHeaderBackdrop(scrollProgress: scrollProgress)
+                                .frame(height: 54 + geometry.safeAreaInsets.top + 30)
+                                .offset(y: -geometry.safeAreaInsets.top)
                         }
                         .accessibilityElement(children: .contain)
                         .accessibilityIdentifier("today-header")
-                        .accessibilityValue(scrollProgress >= 0.98 ? "Actions collapsed" : "Actions expanded")
+                        .accessibilityValue(actionsCollapsed ? "Actions collapsed" : "Actions expanded")
                 }
                 .scrollIndicators(.hidden)
                 .scrollBounceBehavior(.basedOnSize)
                 .scrollClipDisabled()
                 .scrollEdgeEffectHidden(true, for: .top)
-                .onScrollGeometryChange(for: CGFloat.self) { scroll in
-                    let offset = max(0, scroll.contentOffset.y + scroll.contentInsets.top)
-                    // Track physical pixels without separate frame timers or chart updates.
-                    return min(1, (offset * displayScale).rounded() / max(1, displayScale) / 80)
-                } action: { _, progress in
-                    scrollProgress = progress
+                .onScrollGeometryChange(for: PrototypeDashboardScrollState.self) { scroll in
+                    PrototypeDashboardScrollState(
+                        offset: scroll.contentOffset.y + scroll.contentInsets.top,
+                        displayScale: displayScale
+                    )
+                } action: { oldState, state in
+                    scrollProgress = state.blurProgress
+                    guard !showWidgetEditor else { return }
+                    // Separate thresholds prevent toggling around a single scroll point.
+                    if state.zone == .bottom && oldState.zone != .bottom {
+                        actionsCollapsed = true
+                    } else if state.zone == .top && oldState.zone != .top {
+                        actionsCollapsed = false
+                    }
                 }
-                actionsPanel(bottomInset: geometry.safeAreaInsets.bottom)
-                    .frame(height: panelHeight, alignment: .top)
-                    .offset(y: scrollProgress * (panelHeight - 18))
-                    .allowsHitTesting(scrollProgress < 0.98)
-                    .accessibilityHidden(scrollProgress >= 0.98)
-                    .accessibilityElement(children: .contain)
-                    .accessibilityIdentifier("today-actions-panel")
+                PrototypeActionsSheet(
+                    collapsed: $actionsCollapsed,
+                    height: panelHeight,
+                    bottomInset: geometry.safeAreaInsets.bottom,
+                    onStartTest: onStartTest,
+                    onReport: onReport
+                )
             }
         }
         .foregroundStyle(PrototypeTheme.foreground)
@@ -175,19 +195,16 @@ struct TodayView: View {
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
-            .preferredColorScheme(.dark)
+            .preferredColorScheme(PrototypeTheme.colorScheme)
         }
-        .sheet(isPresented: $showWidgetEditor) {
-            WidgetLayoutEditorView(layout: $widgetLayout, onChange: saveWidgetLayout)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .preferredColorScheme(.dark)
+        .onChange(of: showWidgetEditor) { _, editing in
+            if editing { actionsCollapsed = true }
         }
     }
 
     private func widgetGrid(_ widgets: [PrototypeWidget]) -> some View {
         GeometryReader { geometry in
-            VStack(alignment: .leading, spacing: 12) {
+            Group {
                 if widgets.isEmpty {
                     Button {
                         showWidgetGallery = true
@@ -205,62 +222,217 @@ struct TodayView: View {
                     .accessibilityIdentifier("add-widgets")
                     .accessibilityHint("Choose a widget and a size for your dashboard")
                 } else {
-                    ForEach(widgetRows(widgets)) { row in
-                        HStack(alignment: .top, spacing: 12) {
-                            ForEach(row.widgets) { widget in
-                                widgetCard(widget)
-                                    .frame(width: widget.size.width(in: geometry.size.width, spacing: 12), height: widget.size.height)
-                                    .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 16))
-                                    .contextMenu {
-                                        Picker("Widget Size", selection: widgetSizeBinding(for: widget)) {
-                                            ForEach(PrototypeWidgetSize.allCases) { size in
-                                                Label(size.title, systemImage: size.symbol)
-                                                    .tag(size)
-                                            }
-                                        }
-                                        .pickerStyle(.palette)
-                                        .paletteSelectionEffect(.automatic)
-
-                                        Button("Reorder Widgets…", systemImage: "arrow.up.arrow.down") {
-                                            showWidgetEditor = true
-                                        }
-
-                                        let isAboveBlast = widgetLayout.aboveBlastWidgets.contains { $0.id == widget.id }
-                                        Button(
-                                            isAboveBlast ? "Move Below Today’s Blast" : "Move Above Today’s Blast",
-                                            systemImage: isAboveBlast ? "arrow.down.to.line" : "arrow.up.to.line"
-                                        ) {
-                                            changeWidgets { widgetLayout.move(id: widget.id, aboveBlast: !isAboveBlast) }
-                                        }
-
-                                        Button(role: .destructive) {
-                                            changeWidgets { widgetLayout.remove(id: widget.id) }
-                                        } label: {
-                                            Label {
-                                                Text("Remove Widget")
-                                            } icon: {
-                                                if let icon = Self.removeWidgetIcon {
-                                                    Image(uiImage: icon)
-                                                        .renderingMode(.original)
-                                                }
-                                            }
-                                        }
-
-                                        Button("Add Widgets…", systemImage: "plus") {
-                                            showWidgetGallery = true
-                                        }
-                                    }
-                                    .menuOrder(.fixed)
-                            }
-                            if row.columnSpan < 6 {
-                                Spacer(minLength: 0)
-                            }
+                    PrototypeWidgetGrid {
+                        ForEach(widgets) { widget in
+                            dashboardWidget(widget, availableWidth: geometry.size.width)
+                                .layoutValue(key: WidgetColumnSpanKey.self, value: widget.size.columnSpan)
                         }
-                        .frame(height: row.height)
                     }
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func dashboardWidget(_ widget: PrototypeWidget, availableWidth: CGFloat) -> some View {
+        let width = widget.size.width(in: availableWidth, spacing: 12)
+        if showWidgetEditor {
+            ZStack {
+                // Keep the drag/drop surface fixed; only the card's artwork jiggles.
+                widgetCard(widget)
+                    .modifier(WidgetEditingMotion(enabled: draggedWidgetID == nil, phase: widget.id.hashValue.isMultiple(of: 2)))
+                    .opacity(draggedWidgetID == widget.id ? 0.35 : 1)
+                    .allowsHitTesting(false)
+                widgetInteractionSurface(widget, width: width)
+            }
+                .frame(width: width, height: widget.size.height)
+                .contentShape(Rectangle())
+                .overlay(alignment: .topLeading) {
+                    Button {
+                        changeWidgets { widgetLayout.remove(id: widget.id) }
+                    } label: {
+                        Image(systemName: "minus.circle.fill")
+                            .font(.system(size: 23, weight: .semibold))
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(.white, Color.red)
+                            .padding(5)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Remove \(widget.kind.title) Widget")
+                    .accessibilityIdentifier("remove-widget-\(widget.kind.rawValue)")
+                    .offset(x: -8, y: -8)
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("editable-widget-\(widget.kind.rawValue)")
+                .accessibilityValue(draggedWidgetID == widget.id ? "Dragging" : "Ready to move")
+                .accessibilityHint("Drag this card to rearrange the grid. Drop over Today’s Blast to move it above or below the gauge.")
+                .accessibilityAction(named: "Move Earlier") {
+                    changeWidgets { widgetLayout.moveOnePosition(id: widget.id, earlier: true) }
+                }
+                .accessibilityAction(named: "Move Later") {
+                    changeWidgets { widgetLayout.moveOnePosition(id: widget.id, earlier: false) }
+                }
+                .accessibilityAction(named: "Move Above Today’s Blast") {
+                    changeWidgets { widgetLayout.move(id: widget.id, aboveBlast: true) }
+                }
+                .accessibilityAction(named: "Move Below Today’s Blast") {
+                    changeWidgets { widgetLayout.move(id: widget.id, aboveBlast: false) }
+                }
+        } else {
+            widgetCard(widget)
+                .frame(width: width, height: widget.size.height)
+                .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 16))
+                .contextMenu {
+                    Picker("Widget Size", selection: widgetSizeBinding(for: widget)) {
+                        ForEach(PrototypeWidgetSize.allCases) { size in
+                            Label(size.title, systemImage: size.symbol).tag(size)
+                        }
+                    }
+                    .pickerStyle(.palette)
+                    .paletteSelectionEffect(.automatic)
+
+                    Button("Edit Widgets…", systemImage: "square.grid.2x2") {
+                        beginWidgetEditing()
+                    }
+
+                    let isAboveBlast = widgetLayout.aboveBlastWidgets.contains { $0.id == widget.id }
+                    Button(
+                        isAboveBlast ? "Move Below Today’s Blast" : "Move Above Today’s Blast",
+                        systemImage: isAboveBlast ? "arrow.down.to.line" : "arrow.up.to.line"
+                    ) {
+                        changeWidgets { widgetLayout.move(id: widget.id, aboveBlast: !isAboveBlast) }
+                    }
+
+                    Button(role: .destructive) {
+                        changeWidgets { widgetLayout.remove(id: widget.id) }
+                    } label: {
+                        Label {
+                            Text("Remove Widget")
+                        } icon: {
+                            if let icon = Self.removeWidgetIcon {
+                                Image(uiImage: icon).renderingMode(.original)
+                            }
+                        }
+                    }
+
+                    Button("Add Widgets…", systemImage: "plus") { showWidgetGallery = true }
+                }
+                .menuOrder(.fixed)
+        }
+    }
+
+    private func widgetInteractionSurface(_ widget: PrototypeWidget, width: CGFloat) -> some View {
+        // A dedicated interactive leaf keeps native drop hit testing independent
+        // of the card's noninteractive charts and their UIKit representables.
+        RoundedRectangle(cornerRadius: 16)
+            .fill(Color.white.opacity(0.001))
+            .contentShape(Rectangle())
+            .contentShape(.dragPreview, RoundedRectangle(cornerRadius: 16))
+            .onDrag {
+                widgetDragLifecycle.makeProvider(for: widget.id) {
+                    draggedWidgetID = widget.id
+                    lastReorderTarget = nil
+                    WidgetDragDiagnostics.event("source-start", source: widget.id, target: widget.kind.rawValue)
+                    UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+                } onEnd: {
+                    if draggedWidgetID == widget.id {
+                        WidgetDragDiagnostics.event("source-end", source: widget.id)
+                        draggedWidgetID = nil
+                        lastReorderTarget = nil
+                    }
+                }
+            } preview: {
+                widgetCard(widget)
+                    .frame(width: width, height: widget.size.height)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
+            .onDrop(of: [UTType.text], delegate: widgetDropDelegate(.card(widget.id)))
+            .accessibilityHidden(true)
+    }
+
+    private var widgetEditingControls: some View {
+        VStack(spacing: 8) {
+            if showWidgetEditor {
+                Text("Drag widgets to rearrange")
+                    .font(PrototypeFont.inter(11))
+                    .foregroundStyle(PrototypeTheme.muted)
+                HStack(spacing: 10) {
+                    Button("Add Widgets", systemImage: "plus") { showWidgetGallery = true }
+                        .accessibilityIdentifier("widget-edit-add")
+                    Button("Done", systemImage: "checkmark") {
+                        widgetDragLifecycle.finish()
+                        draggedWidgetID = nil
+                        lastReorderTarget = nil
+                        withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { showWidgetEditor = false }
+                        saveWidgetLayout()
+                    }
+                    .accessibilityIdentifier("widget-edit-done")
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("widget-grid-editor")
+            } else {
+                Button("Edit Widgets", systemImage: "square.grid.2x2") { beginWidgetEditing() }
+                    .accessibilityIdentifier("edit-widgets")
+                    .accessibilityHint("Edit and drag the cards directly on this dashboard")
+            }
+        }
+        .font(PrototypeFont.inter(12, weight: .medium))
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
+        .tint(PrototypeTheme.foreground)
+        .controlSize(.small)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .onDrop(of: [UTType.text], delegate: widgetDropDelegate(.end(aboveBlast: false)))
+    }
+
+    private func beginWidgetEditing() {
+        widgetDragLifecycle.finish()
+        draggedWidgetID = nil
+        lastReorderTarget = nil
+        withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { showWidgetEditor = true }
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+    }
+
+    @ViewBuilder
+    private var widgetBlastDropTarget: some View {
+        if showWidgetEditor {
+            VStack(spacing: 0) {
+                widgetBlastDropZone(above: true)
+                widgetBlastDropZone(above: false)
+            }
+        }
+    }
+
+    private func widgetBlastDropZone(above: Bool) -> some View {
+        Rectangle()
+            .fill(Color.clear)
+            .contentShape(Rectangle())
+            .overlay(alignment: above ? .top : .bottom) {
+                Text(above ? "Drop above Today’s Blast" : "Drop below Today’s Blast")
+                    .font(PrototypeFont.inter(10, weight: .medium))
+                    .foregroundStyle(PrototypeTheme.muted)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 5)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .opacity(draggedWidgetID == nil ? 0 : 1)
+            }
+            .onDrop(of: [UTType.text], delegate: widgetDropDelegate(.blast(above: above)))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(above ? "Drop above Today’s Blast" : "Drop below Today’s Blast")
+            .accessibilityIdentifier(above ? "widget-drop-above-blast" : "widget-drop-below-blast")
+    }
+
+    private func widgetDropDelegate(_ position: WidgetDropPosition) -> WidgetGridDropDelegate {
+        WidgetGridDropDelegate(
+            position: position,
+            layout: $widgetLayout,
+            draggedWidgetID: $draggedWidgetID,
+            lastReorderTarget: $lastReorderTarget,
+            dragLifecycle: widgetDragLifecycle,
+            reduceMotion: reduceMotion,
+            onChange: saveWidgetLayout
+        )
     }
 
     @ViewBuilder
@@ -270,6 +442,7 @@ struct TodayView: View {
             BlastExposureCard(
                 averageExposure: currentSample.average,
                 historyHeights: currentSample.history,
+                animateOnAppear: !showWidgetEditor,
                 widgetSize: widget.size
             )
         case .cognition, .sleep, .activity, .heart, .hrv, .respiration:
@@ -277,13 +450,15 @@ struct TodayView: View {
                 kind: widget.kind,
                 size: widget.size,
                 onStartTest: onStartTest,
-                onShowDevices: onShowDevices
+                onShowDevices: onShowDevices,
+                animateOnAppear: !showWidgetEditor
             )
         case .healthSummary:
             HealthSummaryWidgetCard(
                 exposure: currentSample.blast,
                 averageExposure: currentSample.average,
-                size: widget.size
+                size: widget.size,
+                animateOnAppear: !showWidgetEditor
             )
         }
     }
@@ -327,26 +502,11 @@ struct TodayView: View {
     private var header: some View {
         HStack(spacing: 10) {
             Image("vitalis-logo")
+                .renderingMode(.template)
                 .resizable()
                 .scaledToFit()
                 .frame(width: 151.767, height: 24)
                 .accessibilityLabel("Vitalis")
-
-            Menu {
-                Button("Reorder Widgets…", systemImage: "arrow.up.arrow.down") {
-                    showWidgetEditor = true
-                }
-                Button("Add Widgets…", systemImage: "plus") {
-                    showWidgetGallery = true
-                }
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 16, weight: .semibold))
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .accessibilityLabel("Customize Widgets")
-            .accessibilityIdentifier("customize-widgets")
 
             Spacer(minLength: 0)
 
@@ -383,12 +543,16 @@ struct TodayView: View {
             exposure: currentSample.blast,
             averageExposure: currentSample.average,
             onRefresh: refreshExposurePreview,
-            onMotionStarted: { showExposureAlert = false },
+            onMotionStarted: {
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) { showExposureAlert = false }
+            },
             onMotionSettled: {
                 if reduceMotion {
                     showExposureAlert = true
                 } else {
-                    withAnimation(.easeOut(duration: 0.24)) { showExposureAlert = true }
+                    withAnimation(.spring(duration: 0.58, bounce: 0.05)) { showExposureAlert = true }
                 }
             }
         )
@@ -408,8 +572,6 @@ struct TodayView: View {
                 }
             }
                 .frame(width: 24, height: 24)
-                .opacity(showExposureAlert ? 1 : 0)
-                .offset(y: showExposureAlert ? 0 : -3)
                 .accessibilityHidden(true)
 
             Text(currentSample.blast >= ExposurePreviewSample.demoPromptThresholdPSI
@@ -420,87 +582,12 @@ struct TodayView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 34)
+        .blur(radius: showExposureAlert ? 0 : 9)
+        .offset(y: showExposureAlert ? 0 : -64)
+        .opacity(showExposureAlert ? 1 : 0)
         .accessibilityElement(children: .combine)
-    }
-
-    private func actionsPanel(bottomInset: CGFloat) -> some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Image("cognition")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 24, height: 24)
-                    .accessibilityHidden(true)
-
-                Text("Cognitive Test")
-                    .font(PrototypeFont.inter(size: 15, weight: .semibold))
-
-                Text("~30 sec")
-                    .font(PrototypeFont.inter(size: 12, weight: .medium))
-                    .foregroundStyle(PrototypeTheme.muted)
-
-                Spacer(minLength: 0)
-
-                Button("Start", systemImage: "play.fill", action: onStartTest)
-                    .labelStyle(.titleAndIcon)
-                    .buttonStyle(.borderedProminent)
-                    .buttonBorderShape(.capsule)
-                    .controlSize(.small)
-                    .tint(PrototypeTheme.success)
-                    .accessibilityLabel("Start cognitive test")
-            }
-            .padding(.vertical, 16)
-
-            Rectangle()
-                .fill(PrototypeTheme.foreground.opacity(0.28))
-                .frame(height: 1 / max(1, displayScale))
-                .accessibilityHidden(true)
-
-            HStack {
-                Text("Feeling off today?")
-                    .font(PrototypeFont.inter(size: 15))
-
-                Spacer()
-
-                Button("Report Now", action: onReport)
-                    .font(PrototypeFont.inter(size: 15, weight: .medium))
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(.capsule)
-                    .controlSize(.small)
-                    .tint(PrototypeTheme.success)
-                    .foregroundStyle(PrototypeTheme.success)
-                    .frame(minHeight: 30)
-                    .accessibilityLabel("Report how you feel today")
-            }
-            .padding(.vertical, 12)
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background {
-            panelShape
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    panelShape.fill(Color.black.opacity(0.12))
-                }
-                .padding(.bottom, -bottomInset)
-        }
-        .overlay {
-            panelShape
-                .stroke(PrototypeTheme.foreground.opacity(0.3), lineWidth: 0.5)
-                .padding(.bottom, -bottomInset)
-        }
-        .overlay(alignment: .top) {
-            Capsule()
-                .fill(PrototypeTheme.foreground.opacity(0.1))
-                .frame(width: 60, height: 4)
-                .padding(.top, 6)
-                .accessibilityHidden(true)
-        }
-    }
-
-    private var panelShape: UnevenRoundedRectangle {
-        UnevenRoundedRectangle(topLeadingRadius: 38, topTrailingRadius: 38)
+        .accessibilityIdentifier("blast-exposure-notice")
+        .accessibilityHidden(!showExposureAlert)
     }
 
     @MainActor
@@ -577,35 +664,19 @@ struct PrototypeBackdropBlur: UIViewRepresentable {
     func updateUIView(_ view: UIVisualEffectView, context: Context) {
         let fraction = min(1, max(0, progress))
         let coordinator = context.coordinator
-        guard fraction != coordinator.lastProgress else { return }
-        coordinator.lastProgress = fraction
-        if fraction == 0 || fraction == 1 {
-            coordinator.animator?.stopAnimation(true)
-            coordinator.animator = nil
-            view.effect = fraction == 0 ? nil : UIBlurEffect(style: style)
-            return
+        if coordinator.lastStyle != style || coordinator.lastProgress == nil {
+            view.effect = UIBlurEffect(style: style)
+            coordinator.lastStyle = style
         }
-        if coordinator.animator == nil {
-            view.effect = nil
-            let animator = UIViewPropertyAnimator(duration: 1, curve: .linear) { [weak view] in
-                view?.effect = UIBlurEffect(style: style)
-            }
-            animator.pausesOnCompletion = true
-            animator.startAnimation()
-            animator.pauseAnimation()
-            coordinator.animator = animator
+        if coordinator.lastProgress != fraction {
+            view.alpha = fraction
+            coordinator.lastProgress = fraction
         }
-        guard let animator = coordinator.animator else { return }
-        animator.fractionComplete = fraction
-    }
-
-    static func dismantleUIView(_ view: UIVisualEffectView, coordinator: Coordinator) {
-        coordinator.animator?.stopAnimation(true)
     }
 
     final class Coordinator {
-        var animator: UIViewPropertyAnimator?
         var lastProgress: CGFloat?
+        var lastStyle: UIBlurEffect.Style?
     }
 }
 
@@ -625,6 +696,7 @@ private struct DeviceStatusButton: View {
                 ZStack {
                     ZStack {
                         Image(isBodySensor ? "device-two-track" : "device-one-track")
+                            .renderingMode(.template)
                             .resizable()
                             .scaledToFit()
 

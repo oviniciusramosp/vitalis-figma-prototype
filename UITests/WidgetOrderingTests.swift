@@ -10,67 +10,50 @@ final class WidgetOrderingTests: XCTestCase {
             app.terminate()
             app.launchArguments = ["--reset-widget-layout"]
             app.launch()
-            _ = element("customize-widgets", in: app).waitForExistence(timeout: 10)
+            _ = element("today-header", in: app).waitForExistence(timeout: 10)
             app.terminate()
         }
         super.tearDown()
     }
 
-    func testNativeDragMovesMediumWidgetAboveBlastAndPersists() {
+    func testCardDragMovesMediumWidgetAboveBlastAndPersists() {
         let app = launchDefaultLayout()
         let sleep = element("sleep-widget", in: app)
         let blast = element("blast-gauge", in: app)
-        guard require(sleep.waitForExistence(timeout: 5), "The default Sleep widget must exist", in: app),
-              require(blast.exists, "Today's Blast indicator must exist", in: app) else { return }
-        expectValue(sleep, contains: "Widget size: Medium")
+        guard require(sleep.waitForExistence(timeout: 5) && blast.exists,
+                      "Sleep and Today’s Blast must appear", in: app) else { return }
         let originalSize = sleep.frame.size
-        guard require(originalSize.width > 0 && originalSize.height > 0,
-                      "Sleep must have measurable dimensions before moving", in: app) else { return }
-
         guard openEditor(in: app) else { return }
-        let sleepRow = element("widget-layout-row-sleep", in: app)
-        let anchor = element("widget-layout-blast-anchor", in: app)
-        guard require(sleepRow.waitForExistence(timeout: 5) && anchor.exists,
-                      "The editor must expose Sleep and the main Blast gauge", in: app) else { return }
-        expectValue(sleepRow, contains: "Widget size: Medium")
-        expectValue(sleepRow, contains: "Below TODAY’S BLAST")
-        XCTAssertGreaterThan(sleepRow.frame.minY, anchor.frame.maxY)
-        screenshot(app, name: "Native widget editor before dragging")
-
-        dragRow(sleepRow, identifier: "widget-layout-row-sleep", before: anchor, in: app)
-        guard wait("Sleep must move before the Blast anchor after a real handle drag", in: app, condition: {
-            sleepRow.exists && anchor.exists && sleepRow.frame.maxY <= anchor.frame.minY + 2
+        let scroll = app.scrollViews["today-dashboard-scroll"]
+        scroll.swipeDown()
+        let card = element("editable-widget-sleep", in: app)
+        let target = element("widget-drop-above-blast", in: app)
+        guard require(card.exists && target.exists && card.isHittable,
+                      "The editable Sleep card and gauge drop zone must appear", in: app) else { return }
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        let start = origin.withOffset(CGVector(dx: card.frame.midX, dy: card.frame.midY))
+        let end = origin.withOffset(CGVector(dx: target.frame.midX, dy: target.frame.midY))
+        start.press(forDuration: 0.7, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.35)
+        guard wait("A card drag must move Sleep above the gauge", in: app, condition: {
+            card.exists && blast.exists && card.frame.maxY <= blast.frame.minY + 3
         }) else { return }
-        expectValue(sleepRow, contains: "Above TODAY’S BLAST")
-        expectValue(sleepRow, contains: "Widget size: Medium")
-        screenshot(app, name: "Sleep reordered above the Blast anchor")
+        screenshot(app, name: "Sleep card dragged above Today’s Blast")
         guard closeEditor(in: app) else { return }
         scrollToTop(in: app)
         assertMediumAboveBlast(sleep, blast: blast, originalSize: originalSize, in: app)
         expectValue(sleep, contains: "Value: 6h30")
         expectValue(sleep, contains: "Chart days: 7")
-        screenshot(app, name: "Sleep Medium above Today's Blast")
 
         app.terminate()
-        // Omit reset/test-preview flags so this launch reads the persisted layout.
         app.launchArguments = []
         app.launch()
-        guard require(element("customize-widgets", in: app).waitForExistence(timeout: 15),
+        guard require(element("today-header", in: app).waitForExistence(timeout: 15),
                       "The dashboard must reopen", in: app) else { return }
-        scrollToTop(in: app)
         let restoredSleep = element("sleep-widget", in: app)
         let restoredBlast = element("blast-gauge", in: app)
         assertMediumAboveBlast(restoredSleep, blast: restoredBlast, originalSize: originalSize, in: app)
         expectValue(restoredSleep, contains: "Value: 6h30")
-        screenshot(app, name: "Widget order survives app relaunch")
-
-        guard openEditor(in: app) else { return }
-        let restoredRow = element("widget-layout-row-sleep", in: app)
-        let restoredAnchor = element("widget-layout-blast-anchor", in: app)
-        expectValue(restoredRow, contains: "Above TODAY’S BLAST")
-        expectValue(restoredRow, contains: "Widget size: Medium")
-        XCTAssertLessThanOrEqual(restoredRow.frame.maxY, restoredAnchor.frame.minY + 2)
-        guard closeEditor(in: app) else { return }
+        screenshot(app, name: "Card order survives app relaunch")
     }
 
     func testQuickMovesPackMediumPairAndPreserveSizes() {
@@ -118,48 +101,26 @@ final class WidgetOrderingTests: XCTestCase {
         app.launchArguments = ["--reset-widget-layout"]
         needsLayoutReset = true
         app.launch()
-        require(element("customize-widgets", in: app).waitForExistence(timeout: 15),
-                "The dashboard customization menu must appear", in: app)
+        require(element("today-header", in: app).waitForExistence(timeout: 15),
+                "The dashboard header must appear", in: app)
         return app
     }
 
     private func openEditor(in app: XCUIApplication) -> Bool {
-        let customize = element("customize-widgets", in: app)
-        guard require(customize.exists && customize.isHittable, "The header menu must be reachable", in: app) else { return false }
-        customize.tap()
-        let reorder = app.buttons["Reorder Widgets…"]
-        guard require(reorder.waitForExistence(timeout: 5), "The menu must offer Reorder Widgets", in: app) else { return false }
-        reorder.tap()
-        return require(element("widget-layout-editor", in: app).waitForExistence(timeout: 5),
-                       "The native layout editor must open", in: app)
+        let edit = element("edit-widgets", in: app)
+        guard reveal(edit, in: app) else { return false }
+        edit.tap()
+        return require(element("widget-grid-editor", in: app).waitForExistence(timeout: 5),
+                       "The dashboard must enter card editing", in: app)
     }
 
     private func closeEditor(in app: XCUIApplication) -> Bool {
-        let done = element("widget-layout-done", in: app)
-        guard require(done.exists && done.isHittable, "The editor Done action must be reachable", in: app) else { return false }
+        let done = element("widget-edit-done", in: app)
+        guard reveal(done, in: app) else { return false }
         done.tap()
-        return wait("Done must dismiss the layout editor", in: app) {
-            !self.element("widget-layout-editor", in: app).exists
+        return wait("Done must leave card editing", in: app) {
+            !self.element("widget-grid-editor", in: app).exists
         }
-    }
-
-    private func dragRow(_ row: XCUIElement, identifier: String, before anchor: XCUIElement, in app: XCUIApplication) {
-        let matchingCell = app.cells.matching(identifier: identifier).firstMatch
-        let containingCell = app.cells.containing(.any, identifier: identifier).firstMatch
-        let nativeRow = matchingCell.exists ? matchingCell : (containingCell.exists ? containingCell : row)
-        let handle = nativeRow.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Reorder")).firstMatch
-        let matchingAnchorCell = app.cells.matching(identifier: anchor.identifier).firstMatch
-        let containingAnchorCell = app.cells.containing(.any, identifier: anchor.identifier).firstMatch
-        let nativeAnchor = matchingAnchorCell.exists
-            ? matchingAnchorCell
-            : (containingAnchorCell.exists ? containingAnchorCell : anchor)
-        let sourceFrame = handle.exists ? handle.frame : nativeRow.frame
-        let sourceX = handle.exists ? sourceFrame.midX : sourceFrame.maxX - 20
-        // Freeze screen coordinates before the native list shifts its cells during the drag.
-        let origin = app.coordinate(withNormalizedOffset: .zero)
-        let start = origin.withOffset(CGVector(dx: sourceX, dy: sourceFrame.midY))
-        let destination = origin.withOffset(CGVector(dx: sourceX, dy: nativeAnchor.frame.minY - 6))
-        start.press(forDuration: 0.7, thenDragTo: destination, withVelocity: .slow, thenHoldForDuration: 0.6)
     }
 
     private func quickMove(_ widget: XCUIElement, action: String, in app: XCUIApplication) -> Bool {

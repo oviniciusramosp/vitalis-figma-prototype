@@ -66,6 +66,7 @@ struct BlastExposureCard: View {
         VStack(alignment: .leading, spacing: widgetSize == .large ? 8 : 6) {
             HStack(spacing: 4) {
                 Image("exposure-card-icon")
+                    .renderingMode(.template)
                     .resizable()
                     .scaledToFit()
                     .frame(width: widgetSize == .small ? 12 : 16, height: widgetSize == .small ? 12 : 16)
@@ -94,7 +95,7 @@ struct BlastExposureCard: View {
                             .frame(maxWidth: .infinity)
                     }
                     .overlay(alignment: .top) {
-                        Rectangle()
+                        Capsule()
                             .fill(PrototypeTheme.accent)
                             .frame(height: 2)
                             .offset(y: averageLineY(for: displayedAverage) - 1)
@@ -110,7 +111,7 @@ struct BlastExposureCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: widgetSize.height, alignment: .topLeading)
         .foregroundStyle(PrototypeTheme.foreground)
-        .background(Color.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 16))
+        .background(PrototypeTheme.surface, in: RoundedRectangle(cornerRadius: 16))
         .overlay {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(PrototypeTheme.foreground.opacity(0.24), lineWidth: 0.5)
@@ -127,7 +128,7 @@ struct BlastExposureCard: View {
         GeometryReader { _ in
             let labelHeight: CGFloat = widgetSize == .large ? 18 : 12
             VStack(alignment: .leading, spacing: 10) {
-                Text("Average Exposure")
+                Text("\(averageDays)-day avg")
                     .font(PrototypeFont.inter(widgetSize == .large ? 10 : 9))
                     .foregroundStyle(PrototypeTheme.foreground.opacity(0.6))
                     .lineLimit(1)
@@ -190,7 +191,8 @@ struct BlastExposureCard: View {
                         .overlay(alignment: .bottom) {
                             Text(day.label)
                                 .font(PrototypeFont.inter(8))
-                                .foregroundStyle(isSelected ? Color.black.opacity(0.65) : day.isToday ? latestComparisonColor : PrototypeTheme.foreground.opacity(0.6))
+                                .foregroundStyle(day.isToday ? Color.white.opacity(0.96) : isSelected ? selectedWeekdayColor : PrototypeTheme.foreground.opacity(0.6))
+                                .shadow(color: day.isToday ? Color.black.opacity(0.3) : .clear, radius: 1, y: 0.5)
                                 .frame(height: 12.485)
                                 .accessibilityHidden(true)
                         }
@@ -241,6 +243,10 @@ struct BlastExposureCard: View {
         let day = 14 - chartDays + index
         guard selectedDay != day else { return }
         selectedDay = day
+    }
+
+    private var selectedWeekdayColor: Color {
+        PrototypeTheme.selection == .light ? .white.opacity(0.96) : .black.opacity(0.65)
     }
 
     private var historyTrendDescription: String {
