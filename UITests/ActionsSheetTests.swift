@@ -66,7 +66,12 @@ final class ActionsSheetTests: XCTestCase {
         expect(panel, "Collapsed")
         XCTAssertTrue(today.isHittable)
         XCTAssertTrue(more.isHittable)
-        XCTAssertFalse(app.buttons["Start cognitive test"].exists)
+        XCTAssertFalse(app.buttons["Start cognitive test"].isHittable)
+        XCTAssertEqual(today.frame.minY, more.frame.minY, accuracy: 1)
+        XCTAssertEqual(today.frame.height, more.frame.height, accuracy: 1)
+        let leftInset = today.frame.minX - panel.frame.minX
+        XCTAssertEqual(today.frame.minY - panel.frame.minY, leftInset, accuracy: 2)
+        XCTAssertEqual(panel.frame.maxX - more.frame.maxX, leftInset, accuracy: 2)
         screenshot(app, "Native sheet collapsed with tabs visible")
 
         more.tap()
@@ -79,7 +84,7 @@ final class ActionsSheetTests: XCTestCase {
 
         // The native grabber remains usable while the background is scrolled.
         let origin = app.coordinate(withNormalizedOffset: .zero)
-        let grabber = origin.withOffset(CGVector(dx: app.frame.midX, dy: today.frame.minY - 18))
+        let grabber = origin.withOffset(CGVector(dx: app.frame.midX, dy: today.frame.minY - 4))
         grabber.press(forDuration: 0.05, thenDragTo: grabber.withOffset(CGVector(dx: 0, dy: -210)), withVelocity: .slow, thenHoldForDuration: 0.3)
         expect(panel, "Expanded")
         XCTAssertTrue(today.isHittable)

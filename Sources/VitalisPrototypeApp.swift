@@ -19,13 +19,20 @@ private enum PrototypeSheet: String, Identifiable {
     var id: String { rawValue }
 }
 
+private enum NativeActionsLayout {
+    static let inset: CGFloat = 8
+    static let tabHeight: CGFloat = 58
+    static let collapsedHeight = tabHeight + inset * 2
+    static let expandedHeight: CGFloat = 240
+}
+
 struct PrototypeRootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("prototype.native-actions-sheet") private var nativeSheetEnabled = false
     @State private var nativeSheetSessionEnabled = UserDefaults.standard.bool(forKey: "prototype.native-actions-sheet")
     @State private var nativeSheetPresented = false
     @State private var actionsCollapsed = false
-    @State private var nativeDetent: PresentationDetent = .height(240)
+    @State private var nativeDetent: PresentationDetent = .height(NativeActionsLayout.expandedHeight)
     @State private var selectedTab: PrototypeTab = .today
     @State private var activeSheet: PrototypeSheet?
     @State private var selectedDevice: PrototypeDevice?
@@ -43,13 +50,13 @@ struct PrototypeRootView: View {
                 dashboard
                     .sheet(isPresented: $nativeSheetPresented) {
                         rootContent
-                            .presentationDetents((selectedTab == .more || selectedDevice != nil) ? [.large] : [.height(100), .height(240)], selection: $nativeDetent)
+                            .presentationDetents((selectedTab == .more || selectedDevice != nil) ? [.large] : [.height(NativeActionsLayout.collapsedHeight), .height(NativeActionsLayout.expandedHeight)], selection: $nativeDetent)
                             .presentationDragIndicator(.visible)
                             .presentationBackgroundInteraction(.enabled)
                             // Preserve the system corner geometry shared by the screen, sheet and tab bar.
                             .interactiveDismissDisabled()
                             .onChange(of: nativeDetent) { _, detent in
-                                if selectedTab == .today { actionsCollapsed = detent == .height(100) }
+                                if selectedTab == .today { actionsCollapsed = detent == .height(NativeActionsLayout.collapsedHeight) }
                             }
                     }
             } else {
@@ -72,16 +79,16 @@ struct PrototypeRootView: View {
         }
         .onChange(of: actionsCollapsed) { _, collapsed in
             guard usesNativeSheet, selectedTab == .today else { return }
-            withAnimation(.spring(duration: 0.48, bounce: 0.09)) {
-                nativeDetent = .height(collapsed ? 100 : 240)
+            withAnimation(reduceMotion ? nil : .spring(duration: 0.55, bounce: 0.025)) {
+                nativeDetent = .height(collapsed ? NativeActionsLayout.collapsedHeight : NativeActionsLayout.expandedHeight)
             }
         }
         .onChange(of: selectedDevice) { _, device in
             guard usesNativeSheet else { return }
-            nativeDetent = device != nil || selectedTab == .more ? .large : .height(actionsCollapsed ? 100 : 240)
+            nativeDetent = device != nil || selectedTab == .more ? .large : .height(actionsCollapsed ? NativeActionsLayout.collapsedHeight : NativeActionsLayout.expandedHeight)
         }
         .onChange(of: selectedTab) { _, tab in
-            nativeDetent = tab == .more ? .large : .height(actionsCollapsed ? 100 : 240)
+            nativeDetent = tab == .more ? .large : .height(actionsCollapsed ? NativeActionsLayout.collapsedHeight : NativeActionsLayout.expandedHeight)
         }
     }
 
@@ -132,27 +139,11 @@ struct PrototypeRootView: View {
         TabView(selection: activeTabBinding) {
             Tab("Today", systemImage: "text.rectangle.page", value: .today) {
                 if usesNativeSheet {
-                    VStack(spacing: 0) {
-                        if actionsCollapsed {
-                            collapsedTabs
-                                .frame(maxHeight: .infinity, alignment: .bottom)
-                                .padding(.horizontal, 8)
-                                .padding(.bottom, 8)
-                        } else {
-                            PrototypeActionRows(
-                                onStartTest: { activeSheet = .cognitiveTest },
-                                onReport: { activeSheet = .report }
-                            )
-                            .padding(.horizontal, 20)
-                            .padding(.top, 12)
-                            Spacer(minLength: 0)
-                        }
-                    }
-                    // Keep one glass surface when collapsed; restore native tabs on expansion.
-                    .toolbarVisibility(actionsCollapsed ? .hidden : .visible, for: .tabBar)
-                    .accessibilityElement(children: .contain)
-                    .accessibilityIdentifier("native-actions-panel")
-                    .accessibilityValue(actionsCollapsed ? "Collapsed" : "Expanded")
+                    nativeActionsPanel
+                        .toolbarVisibility(.hidden, for: .tabBar)
+                        .accessibilityElement(children: .contain)
+                        .accessibilityIdentifier("native-actions-panel")
+                        .accessibilityValue(actionsCollapsed ? "Collapsed" : "Expanded")
                 } else {
                     dashboard
                 }
@@ -194,8 +185,44 @@ struct PrototypeRootView: View {
         }
     }
 
+    /// Keep the controls and selection identical throughout native sheet resizing.
+    /// Only the secondary glass backing fades; the sheet remains the shared surface.
+    private var nativeActionsPanel: some View {
+        GeometryReader { geometry in
+            let expansion = min(1, max(0,
+                (geometry.size.height - NativeActionsLayout.collapsedHeight)
+                / (NativeActionsLayout.expandedHeight - NativeActionsLayout.collapsedHeight)
+            ))
+            Color.clear
+                .overlay(alignment: .top) {
+                    PrototypeActionRows(
+                        onStartTest: { activeSheet = .cognitiveTest },
+                        onReport: { activeSheet = .report }
+                    )
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .opacity(expansion)
+                    .allowsHitTesting(!actionsCollapsed)
+                    .accessibilityHidden(actionsCollapsed)
+                }
+                .overlay(alignment: .bottom) {
+                    sheetTabs
+                        .background {
+                            Capsule()
+                                .fill(.clear)
+                                .glassEffect(.regular, in: Capsule())
+                                .opacity(expansion * 0.35)
+                                .allowsHitTesting(false)
+                        }
+                        .padding(NativeActionsLayout.inset)
+                }
+                .clipped()
+        }
+    }
+
     /// Transparent controls share the native sheet's glass instead of adding another capsule.
-    private var collapsedTabs: some View {
+    private var sheetTabs: some View {
         HStack(spacing: 0) {
             collapsedTab("Today", symbol: "text.rectangle.page", tab: .today)
             collapsedTab("Exposure", symbol: "dot.radiowaves.left.and.right", tab: .exposure)
@@ -211,15 +238,16 @@ struct PrototypeRootView: View {
             VStack(spacing: 4) {
                 Image(systemName: symbol)
                     .font(.system(size: 24))
+                    .frame(height: 26)
                 Text(title)
                     .font(.system(size: 11, weight: .semibold))
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 58)
+            .frame(height: NativeActionsLayout.tabHeight)
             .contentShape(Rectangle())
             .background {
                 if selectedTab == tab {
-                    Capsule().fill(PrototypeTheme.foreground.opacity(0.12))
+                    Capsule().fill(Color.black.opacity(0.13))
                 }
             }
         }
