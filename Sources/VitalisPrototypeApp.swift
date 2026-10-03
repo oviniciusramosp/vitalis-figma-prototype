@@ -193,6 +193,7 @@ struct PrototypeRootView: View {
                 (geometry.size.height - NativeActionsLayout.collapsedHeight)
                 / (NativeActionsLayout.expandedHeight - NativeActionsLayout.collapsedHeight)
             ))
+            let tabInset = sheetTabInset(in: geometry, expansion: expansion)
             Color.clear
                 .overlay(alignment: .top) {
                     PrototypeActionRows(
@@ -210,18 +211,40 @@ struct PrototypeRootView: View {
                 .overlay(alignment: .bottom) {
                     sheetTabs
                         .background {
-                            Capsule()
+                            ConcentricRectangle(
+                                uniformTopCorners: .fixed(NativeActionsLayout.tabHeight / 2),
+                                uniformBottomCorners: .concentric
+                            )
                                 .fill(.clear)
-                                .glassEffect(.regular, in: Capsule())
+                                .glassEffect(.regular, in: ConcentricRectangle(
+                                    uniformTopCorners: .fixed(NativeActionsLayout.tabHeight / 2),
+                                    uniformBottomCorners: .concentric
+                                ))
                                 .opacity(expansion * 0.35)
                                 .allowsHitTesting(false)
                         }
-                        .padding(NativeActionsLayout.inset)
+                        .padding(tabInset)
                         // Expanded sheets include the home-indicator safe area in their glass.
                         // Follow that inset continuously, without moving the collapsed controls.
                         .offset(y: geometry.safeAreaInsets.bottom * expansion)
                 }
         }
+    }
+
+    private func sheetTabInset(in geometry: GeometryProxy, expansion: CGFloat) -> CGFloat {
+        // A capsule's radius is half its height. Align its center of curvature
+        // with the native sheet by subtracting that radius from the outer radius.
+        var expandedInset: CGFloat = 20
+        if #available(iOS 27.0, *), let radii = geometry.concentricCornerRadii(in: CGRect(
+            origin: .zero,
+            size: CGSize(width: geometry.size.width,
+                         height: geometry.size.height + geometry.safeAreaInsets.bottom)
+        )) {
+            expandedInset = max(NativeActionsLayout.inset,
+                               max(radii.bottomLeading, radii.bottomTrailing)
+                               - NativeActionsLayout.tabHeight / 2)
+        }
+        return NativeActionsLayout.inset + (expandedInset - NativeActionsLayout.inset) * expansion
     }
 
     /// Transparent controls share the native sheet's glass instead of adding another capsule.
