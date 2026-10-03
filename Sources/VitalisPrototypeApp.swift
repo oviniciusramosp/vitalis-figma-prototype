@@ -206,6 +206,7 @@ struct PrototypeRootView: View {
                     .allowsHitTesting(!actionsCollapsed)
                     .accessibilityHidden(actionsCollapsed)
                 }
+                .clipped()
                 .overlay(alignment: .bottom) {
                     sheetTabs
                         .background {
@@ -216,8 +217,10 @@ struct PrototypeRootView: View {
                                 .allowsHitTesting(false)
                         }
                         .padding(NativeActionsLayout.inset)
+                        // Expanded sheets include the home-indicator safe area in their glass.
+                        // Follow that inset continuously, without moving the collapsed controls.
+                        .offset(y: geometry.safeAreaInsets.bottom * expansion)
                 }
-                .clipped()
         }
     }
 

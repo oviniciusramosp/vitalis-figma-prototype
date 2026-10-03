@@ -60,6 +60,8 @@ final class ActionsSheetTests: XCTestCase {
         XCTAssertTrue(today.isHittable)
         XCTAssertTrue(more.isHittable)
         XCTAssertTrue(app.buttons["Start cognitive test"].isHittable)
+        let expandedSideInset = today.frame.minX - panel.frame.minX
+        XCTAssertEqual(panel.frame.maxY - today.frame.maxY, expandedSideInset, accuracy: 2)
         screenshot(app, "Native sheet expanded with embedded tabs")
 
         scroll.swipeUp()
