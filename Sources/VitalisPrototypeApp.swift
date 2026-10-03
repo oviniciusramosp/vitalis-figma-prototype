@@ -58,6 +58,11 @@ struct PrototypeRootView: View {
         }
         .preferredColorScheme(PrototypeTheme.colorScheme)
         .task(id: usesNativeSheet) {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--persist-native-actions-sheet") {
+                nativeSheetEnabled = true
+            }
+            #endif
             nativeSheetPresented = false
             guard usesNativeSheet else { return }
             // Let the previous TabView disappear before presenting its replacement.
