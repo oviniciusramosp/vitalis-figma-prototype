@@ -1,8 +1,7 @@
 import SwiftUI
 import MetalKit
 
-/// Native rendering of the Figma mesh shader (128:7746), with stable paper grain
-/// and subtle, sensor-driven parallax independent of the foreground interface.
+/// Native mesh gradient, deformed by device tilt, with an independent grain overlay.
 /// The original WGSL/TypeScript source is retained in DesignReference.
 struct PrototypeBackground: View {
     @Environment(\.scenePhase) private var scenePhase
@@ -38,7 +37,7 @@ struct PrototypeBackground: View {
 
 /// Internal texture tuning: sRGB grain amplitude and a fixed, exactly representable seed.
 private enum BackgroundTexture {
-    static let grainAmplitude: Float = 0.024
+    static let grainAmplitude: Float = 0.032
     static let grainSeed: Float = 4171
 }
 
@@ -99,12 +98,15 @@ private final class MeshRenderer: NSObject, MTKViewDelegate {
     private static var sharedResources: Resources?
     private var resources: Resources?
     private var resolvedTexture: MTLTexture?
+    private var multisampleTexture: MTLTexture?
     private var canvasSize: CGSize = .zero
+    private var renderedOffset: CGSize?
 
     private final class Resources {
         let queue: MTLCommandQueue
         let meshPipeline: MTLRenderPipelineState
         let resolvePipeline: MTLRenderPipelineState
+        let noisePipeline: MTLRenderPipelineState
         let parameters: MTLBuffer
         let indices: MTLBuffer
         let uniforms: MTLBuffer
@@ -125,6 +127,18 @@ private final class MeshRenderer: NSObject, MTKViewDelegate {
             resolve.fragmentFunction = library.makeFunction(name: "resolveFragment")
             resolve.colorAttachments[0].pixelFormat = .bgra8Unorm
             resolvePipeline = try device.makeRenderPipelineState(descriptor: resolve)
+            let noise = MTLRenderPipelineDescriptor()
+            noise.vertexFunction = library.makeFunction(name: "resolveVertex")
+            noise.fragmentFunction = library.makeFunction(name: "noiseFragment")
+            let overlay = noise.colorAttachments[0]!
+            overlay.pixelFormat = .bgra8Unorm
+            overlay.isBlendingEnabled = true
+            // Overlay a neutral 50% gray noise field: 2 * source * destination.
+            overlay.sourceRGBBlendFactor = .destinationColor
+            overlay.destinationRGBBlendFactor = .sourceColor
+            overlay.sourceAlphaBlendFactor = .zero
+            overlay.destinationAlphaBlendFactor = .one
+            noisePipeline = try device.makeRenderPipelineState(descriptor: noise)
 
             let tessellation = 190
             let side = tessellation + 1
@@ -155,7 +169,9 @@ private final class MeshRenderer: NSObject, MTKViewDelegate {
                     values.append(SIMD4(column, row, 0, 0))
                 }
             }
-            values.append(contentsOf: MeshRenderer.colors.map { SIMD4($0.x, $0.y, $0.z, 1) })
+            values.append(contentsOf: MeshRenderer.colors.map {
+                SIMD4(MeshRenderer.linearChannel($0.x), MeshRenderer.linearChannel($0.y), MeshRenderer.linearChannel($0.z), 1)
+            })
             uniforms = values.withUnsafeBytes { device.makeBuffer(bytes: $0.baseAddress!, length: $0.count)! }
         }
     }
@@ -177,7 +193,9 @@ private final class MeshRenderer: NSObject, MTKViewDelegate {
 
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
         resolvedTexture = nil
+        multisampleTexture = nil
         canvasSize = .zero
+        renderedOffset = nil
         view.setNeedsDisplay()
     }
 
@@ -187,9 +205,11 @@ private final class MeshRenderer: NSObject, MTKViewDelegate {
               let drawable = view.currentDrawable,
               let command = resources.queue.makeCommandBuffer() else { return }
         let size = CGSize(width: drawable.texture.width, height: drawable.texture.height)
+        var motion = SIMD4<Float>(Float(offset.width / BackgroundMotion.maximumDisplacement),
+                                  Float(offset.height / BackgroundMotion.maximumDisplacement), 0, 0)
         if resolvedTexture == nil || canvasSize != size {
-            // Cache the original full mesh once. The smooth field uses half physical
-            // resolution; the final pass still hashes every full resolution pixel.
+            // Keep GPU attachments, geometry and pipelines. Only the smooth gradient
+            // is half-resolution; the independent grain uses physical screen pixels.
             let width = max(1, Int(ceil(size.width * (449.695 / 402) * 0.5)))
             let height = max(1, Int(ceil(size.height * (977.696 / 874) * 0.5)))
             let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba16Float, width: width, height: height, mipmapped: false)
@@ -202,9 +222,16 @@ private final class MeshRenderer: NSObject, MTKViewDelegate {
             descriptor.sampleCount = 1
             descriptor.usage = [.renderTarget, .shaderRead]
             guard let resolved = device.makeTexture(descriptor: descriptor) else { return }
+            multisampleTexture = multisample
+            resolvedTexture = resolved
+            canvasSize = size
+            renderedOffset = nil
+        }
+        if renderedOffset != offset {
+            guard let multisampleTexture, let resolvedTexture else { return }
             let pass = MTLRenderPassDescriptor()
-            pass.colorAttachments[0].texture = multisample
-            pass.colorAttachments[0].resolveTexture = resolved
+            pass.colorAttachments[0].texture = multisampleTexture
+            pass.colorAttachments[0].resolveTexture = resolvedTexture
             pass.colorAttachments[0].loadAction = .clear
             pass.colorAttachments[0].storeAction = .multisampleResolve
             pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0)
@@ -212,10 +239,10 @@ private final class MeshRenderer: NSObject, MTKViewDelegate {
             encoder.setRenderPipelineState(resources.meshPipeline)
             encoder.setVertexBuffer(resources.parameters, offset: 0, index: 0)
             encoder.setVertexBuffer(resources.uniforms, offset: 0, index: 1)
+            encoder.setVertexBytes(&motion, length: MemoryLayout<SIMD4<Float>>.stride, index: 2)
             encoder.drawIndexedPrimitives(type: .triangle, indexCount: resources.indexCount, indexType: .uint32, indexBuffer: resources.indices, indexBufferOffset: 0)
             encoder.endEncoding()
-            resolvedTexture = resolved
-            canvasSize = size
+            renderedOffset = offset
         }
         guard let resolvedTexture else { return }
         // xy = UV displacement, z = grain amplitude, w = seed. Both float4
@@ -225,7 +252,7 @@ private final class MeshRenderer: NSObject, MTKViewDelegate {
             Float(offset.height / max(view.bounds.height, 1)),
             BackgroundTexture.grainAmplitude, BackgroundTexture.grainSeed
         )
-        // z switches only the final luminosity pass; the cached mesh and grain stay intact.
+        // Theme adjusts the final tone; the original mesh palette remains shared.
         var dimensions = SIMD4<Float>(Float(size.width), Float(size.height), theme.meshIndex, 0)
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = drawable.texture
@@ -236,6 +263,9 @@ private final class MeshRenderer: NSObject, MTKViewDelegate {
             encoder.setFragmentTexture(resolvedTexture, index: 0)
             encoder.setFragmentBytes(&effects, length: MemoryLayout<SIMD4<Float>>.stride, index: 0)
             encoder.setFragmentBytes(&dimensions, length: MemoryLayout<SIMD4<Float>>.stride, index: 1)
+            encoder.setFragmentBytes(&motion, length: MemoryLayout<SIMD4<Float>>.stride, index: 2)
+            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
+            encoder.setRenderPipelineState(resources.noisePipeline)
             encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
             encoder.endEncoding()
         }
@@ -244,6 +274,10 @@ private final class MeshRenderer: NSObject, MTKViewDelegate {
     }
 
     // Point order p00,p10,p20,p30,p01,...,p33; original unrounded color values.
+    private static func linearChannel(_ value: Float) -> Float {
+        value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+    }
+
     private static let colors: [SIMD3<Float>] = [
         SIMD3(0.48867562413215637, 0.25798678398132324, 0.112982377409935),
         SIMD3(0.2705882489681244, 0.14901961386203766, 0.07450980693101883),
@@ -276,13 +310,6 @@ private final class MeshRenderer: NSObject, MTKViewDelegate {
         float t2=t*t, t3=t2*t;
         return 0.5*((2.0*b)+(-a+c)*t+(2.0*a-5.0*b+4.0*c-d)*t2+(-a+3.0*b-3.0*c+d)*t3);
     }
-    float srgbToLinearChannel(float value) {
-        return value<=0.04045 ? value/12.92 : pow((value+0.055)/1.055,2.4);
-    }
-    float4 srgbToLinear(float4 color) {
-        color=clamp(color,0.0,1.0);
-        return float4(srgbToLinearChannel(color.r),srgbToLinearChannel(color.g),srgbToLinearChannel(color.b),color.a);
-    }
     float2 segment(float value) {
         float scaled=clamp(value,0.0,1.0)*3.0;
         float index=min(floor(scaled),2.0);
@@ -306,18 +333,23 @@ private final class MeshRenderer: NSObject, MTKViewDelegate {
         int x0=max(ix-1,0),x1=ix,x2=ix+1,x3=min(ix+2,3);
         int y0=max(iy-1,0),y1=iy,y2=iy+1,y3=min(iy+2,3);
         int offset=16;
-        float4 row0=catmull4(srgbToLinear(uniforms.values[offset+pointIndex(x0,y0)]),srgbToLinear(uniforms.values[offset+pointIndex(x1,y0)]),srgbToLinear(uniforms.values[offset+pointIndex(x2,y0)]),srgbToLinear(uniforms.values[offset+pointIndex(x3,y0)]),sx.y);
-        float4 row1=catmull4(srgbToLinear(uniforms.values[offset+pointIndex(x0,y1)]),srgbToLinear(uniforms.values[offset+pointIndex(x1,y1)]),srgbToLinear(uniforms.values[offset+pointIndex(x2,y1)]),srgbToLinear(uniforms.values[offset+pointIndex(x3,y1)]),sx.y);
-        float4 row2=catmull4(srgbToLinear(uniforms.values[offset+pointIndex(x0,y2)]),srgbToLinear(uniforms.values[offset+pointIndex(x1,y2)]),srgbToLinear(uniforms.values[offset+pointIndex(x2,y2)]),srgbToLinear(uniforms.values[offset+pointIndex(x3,y2)]),sx.y);
-        float4 row3=catmull4(srgbToLinear(uniforms.values[offset+pointIndex(x0,y3)]),srgbToLinear(uniforms.values[offset+pointIndex(x1,y3)]),srgbToLinear(uniforms.values[offset+pointIndex(x2,y3)]),srgbToLinear(uniforms.values[offset+pointIndex(x3,y3)]),sx.y);
+        // Palette is converted to linear RGB once when uploading the uniforms.
+        float4 row0=catmull4(uniforms.values[offset+pointIndex(x0,y0)],uniforms.values[offset+pointIndex(x1,y0)],uniforms.values[offset+pointIndex(x2,y0)],uniforms.values[offset+pointIndex(x3,y0)],sx.y);
+        float4 row1=catmull4(uniforms.values[offset+pointIndex(x0,y1)],uniforms.values[offset+pointIndex(x1,y1)],uniforms.values[offset+pointIndex(x2,y1)],uniforms.values[offset+pointIndex(x3,y1)],sx.y);
+        float4 row2=catmull4(uniforms.values[offset+pointIndex(x0,y2)],uniforms.values[offset+pointIndex(x1,y2)],uniforms.values[offset+pointIndex(x2,y2)],uniforms.values[offset+pointIndex(x3,y2)],sx.y);
+        float4 row3=catmull4(uniforms.values[offset+pointIndex(x0,y3)],uniforms.values[offset+pointIndex(x1,y3)],uniforms.values[offset+pointIndex(x2,y3)],uniforms.values[offset+pointIndex(x3,y3)],sx.y);
         return clamp(catmull4(row0,row1,row2,row3,sy.y),0.0,1.0);
     }
-    vertex MeshOutput meshVertex(uint id [[vertex_id]],device const float2 *parameters [[buffer(0)]],constant Uniforms &uniforms [[buffer(1)]]) {
-        float2 position=meshPosition(parameters[id],uniforms);
+    vertex MeshOutput meshVertex(uint id [[vertex_id]],device const float2 *parameters [[buffer(0)]],constant Uniforms &uniforms [[buffer(1)]],constant float4 &motion [[buffer(2)]]) {
+        float2 parameter=parameters[id];
+        float2 position=meshPosition(parameter,uniforms);
+        // Re-evaluate the gradient field as the device tilts. At rest this is
+        // the original mesh; its color contours bend independently of the UI.
+        float2 flow=float2(sin(parameter.y*M_PI_F),sin(parameter.x*M_PI_F));
+        float2 colorParameter=clamp(parameter-motion.xy*flow*float2(0.16,0.12),0.0,1.0);
         MeshOutput output;
-        // Cache the complete shader node; the final pass applies its original crop.
         output.position=float4(position.x*2.0-1.0,1.0-position.y*2.0,0.0,1.0);
-        output.color=meshColor(parameters[id],uniforms);
+        output.color=meshColor(colorParameter,uniforms);
         return output;
     }
     fragment float4 meshFragment(MeshOutput input [[stage_in]]) { return input.color; }
@@ -338,8 +370,7 @@ private final class MeshRenderer: NSObject, MTKViewDelegate {
         value=value^(value>>16u);
         return float(value)*(1.0/4294967295.0)*2.0-1.0;
     }
-    fragment float4 resolveFragment(ResolveOutput input [[stage_in]],texture2d<float> source [[texture(0)]],constant float4 &effects [[buffer(0)]],constant float4 &dimensions [[buffer(1)]]) {
-        uint2 pixel=uint2(input.position.xy);
+    fragment float4 resolveFragment(ResolveOutput input [[stage_in]],texture2d<float> source [[texture(0)]],constant float4 &effects [[buffer(0)]],constant float4 &dimensions [[buffer(1)]],constant float4 &motion [[buffer(2)]]) {
         float2 screenUV=input.position.xy/dimensions.xy;
         float2 meshUV=(screenUV-effects.xy-0.5)*float2(402.0/449.695,874.0/977.696)+0.5;
         meshUV.x-=0.04/449.695;
@@ -349,11 +380,21 @@ private final class MeshRenderer: NSObject, MTKViewDelegate {
         // Figma's white Color blend keeps backdrop luminosity, then white Screen at 30%.
         float luminosity=dot(rgb,float3(0.30,0.59,0.11));
         float baseGray=luminosity*0.70+0.30;
-        float grainStrength=1.0;
-        if (dimensions.z>1.5) { baseGray=0.79+luminosity*0.35; grainStrength=0.70; }
-        else if (dimensions.z>0.5) { baseGray=0.07+luminosity*0.42; grainStrength=0.55; }
-        float finalGray=clamp(baseGray+grain(pixel,uint(effects.w))*effects.z*grainStrength,0.0,1.0);
+        float lightResponse=1.0;
+        if (dimensions.z>1.5) { baseGray=0.79+luminosity*0.35; lightResponse=0.55; }
+        else if (dimensions.z>0.5) { baseGray=0.07+luminosity*0.42; lightResponse=0.8; }
+        // A broad light field follows tilt. Zero tilt preserves the reference tone.
+        float light=dot(motion.xy,float2(0.5-screenUV.x,screenUV.y-0.5))*0.065;
+        float finalGray=clamp(baseGray+light*lightResponse,0.0,1.0);
         return float4(finalGray,finalGray,finalGray,color.a);
+    }
+
+    fragment float4 noiseFragment(ResolveOutput input [[stage_in]],constant float4 &effects [[buffer(0)]],constant float4 &dimensions [[buffer(1)]]) {
+        // Independent overlay, anchored to physical screen pixels. No motion/time
+        // input: texture stays still while the gradient underneath changes.
+        float strength=dimensions.z>1.5 ? 0.35 : 1.0;
+        float noise=0.5+grain(uint2(input.position.xy),uint(effects.w))*effects.z*strength;
+        return float4(noise,noise,noise,1.0);
     }
     """
 }

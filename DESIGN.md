@@ -8,7 +8,7 @@ No app, abra **More → Design System** para consultar amostras vivas, trocar o 
 
 ## Identidade e temas
 
-O fundo combina um gradiente suave, textura de grain estável e uma resposta sutil à inclinação do iPhone. Cards translúcidos organizam o conteúdo sem apagar essa textura. Os números são protagonistas; o movimento estabelece a ordem de leitura: gauge, valor, tendência e mensagem.
+O fundo combina um mesh gradient, uma camada de grain estável e resposta perceptível à inclinação do iPhone. O movimento deforma o campo do gradiente, desloca suas áreas de luz e cria parallax em relação ao conteúdo. Cards translúcidos organizam o conteúdo sem apagar essa textura. Os números são protagonistas; o movimento estabelece a ordem de leitura: gauge, valor, tendência e mensagem.
 
 Existem três temas: **Gray**, **Dark** e **Light**. Gray é o padrão. A seleção em More ou no catálogo vale para todo o app e persiste no dispositivo. `PrototypeAppearance` guarda essa seleção; `PrototypeTheme` fornece os tokens e a aparência nativa correspondente.
 
@@ -37,9 +37,11 @@ Laranja e verde estão no asset catalog. Vermelho e azul são cores semânticas 
 
 ### Textura e parallax
 
-`PrototypeBackground` renderiza `PrototypeMesh.metal` com MetalKit. A textura usa amplitude `0.024` e seed estável `4171`; ela acompanha a resolução da superfície. A malha e o grain são preparados e reutilizados pelo renderer.
+`PrototypeBackground` renderiza `PrototypeMesh.metal` com MetalKit. O campo do gradiente é recalculado na GPU quando a inclinação muda. Geometry, pipelines e attachments são reutilizados; a paleta é convertida para RGB linear uma vez na preparação. O gradiente em repouso mantém os pontos e a composição tonal da referência.
 
-`BackgroundMotion` controla o deslocamento sutil do fundo. O sensor funciona enquanto a página está visível e o app ativo. Reduce Motion desativa a resposta à inclinação. Preserve essa relação com o ciclo de vida ao reutilizar o fundo.
+O ruído é uma camada independente, aplicada depois do gradiente no mesmo render pass. Usa amplitude `0.032`, seed estável `4171` e coordenadas de pixels físicos. A composição multiplica o fundo por um campo neutro de cinza, com menor intensidade no tema Light. O grain não se move nem muda de seed durante a inclinação: ele evita uma textura que parece deslizar ou cintilar.
+
+`BackgroundMotion` calibra a posição inicial e suaviza as amostras em sincronia com a tela. A resposta chega ao limite com cerca de 12,6° de inclinação relativa e desloca o campo em até 32 pt, além de sua deformação e iluminação. O sensor funciona enquanto a página está visível e o app ativo. Reduce Motion desativa a resposta à inclinação. Preserve essa relação com o ciclo de vida ao reutilizar o fundo.
 
 ## Tokens — tipografia
 
@@ -172,7 +174,7 @@ O botão pequeno **Edit Widgets**, ao final da lista, ativa a edição. Cards en
 | Mensagem de exposição | Slide para baixo vindo da região do gauge, blur reduzindo a zero |
 | Catálogo | Replay do gauge real; amostras dos widgets animam ao aparecer |
 
-O estado intermediário do gauge fica no próprio componente para evitar atualizar todo o dashboard a cada tick. O fundo usa recursos Metal compartilhados e atualizações sob demanda. O app solicita a cadência máxima disponível; FPS, haptics e resposta ao sensor ainda precisam de avaliação no iPhone físico.
+O estado intermediário do gauge fica no próprio componente para evitar atualizar todo o dashboard a cada tick. O fundo usa recursos Metal compartilhados e atualizações sob demanda; o sensor envia parâmetros direto ao renderer, sem reconstruir a árvore SwiftUI a cada frame. O app solicita a cadência máxima disponível; FPS, haptics e resposta ao sensor ainda precisam de avaliação no iPhone físico.
 
 Reduce Motion apresenta os valores diretamente, remove a sequência de entrada e desativa parallax. Preserve essa alternativa ao adicionar animações. Tarefas e haptics devem parar quando a view sai da tela ou o app perde atividade.
 

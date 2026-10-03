@@ -21,10 +21,10 @@ final class BackgroundMotion: ObservableObject {
     private var previewStartedAt: TimeInterval?
     private var isRunning = false
 
-    private static let maximumDisplacement: Double = 10
-    private static let fullTiltRadians: Double = 0.28
-    private static let smoothingTime: Double = 0.14
-    private static let settleDistance: Double = 0.025
+    static let maximumDisplacement: Double = 32
+    private static let fullTiltRadians: Double = 0.22
+    private static let smoothingTime: Double = 0.10
+    private static let settleDistance: Double = 0.06
 
     func start() {
         guard !isRunning else { return }
@@ -99,7 +99,8 @@ final class BackgroundMotion: ObservableObject {
         let now = link.targetTimestamp
         if let previewStartedAt {
             let phase = (ProcessInfo.processInfo.systemUptime - previewStartedAt) * (2 * Double.pi / 5)
-            target = clamped(x: sin(phase) * 9, y: cos(phase) * 4)
+            target = clamped(x: sin(phase) * Self.maximumDisplacement,
+                             y: cos(phase) * Self.maximumDisplacement * 0.65)
         }
         let elapsed = min(max(now - (previousTimestamp ?? link.timestamp), 1.0 / 240.0), 0.1)
         previousTimestamp = now
