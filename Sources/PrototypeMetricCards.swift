@@ -150,35 +150,35 @@ private struct MetricWidgetCard: View {
         ExposureComparison.compare(exposure: data.today, average: size == .medium ? data.average(days: 7) : averageOverride ?? data.average(days: 14))
     }
     private var trendColor: Color { data.trendColor(for: comparison) }
+    private var chartHeight: CGFloat { PrototypeStyle.chartHeight(for: size) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: size == .large ? 8 : 6) {
             WidgetMetricHeader(kind: data.kind, title: titleOverride ?? data.kind.title, size: size)
                 .frame(height: size == .large ? 18 : 16, alignment: .leading)
-            if size == .small {
-                valueColumn
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .frame(height: 64, alignment: .center)
-            } else {
-                GeometryReader { geometry in
-                    HStack(alignment: .bottom, spacing: 6) {
-                        valueColumn
-                            .frame(width: size == .large ? min(123, geometry.size.width * 0.45) : geometry.size.width * 0.55, alignment: .leading)
-                            .frame(maxHeight: .infinity, alignment: .center)
-                        WidgetMetricChart(
-                            data: data,
-                            values: animateOnAppear ? animatedReadings : data.readings,
-                            days: chartDays,
-                            height: size == .large ? 76 : 64,
-                            color: trendColor,
-                            reduceMotion: reduceMotion
-                        )
-                    }
+            GeometryReader { geometry in
+                let valueWidth = size == .small ? geometry.size.width
+                    : size == .large ? min(123, geometry.size.width * 0.45) : geometry.size.width * 0.55
+                let gap: CGFloat = size == .small ? 0 : 6
+                HStack(alignment: .bottom, spacing: gap) {
+                    valueColumn
+                        .frame(width: valueWidth, height: chartHeight, alignment: .bottomLeading)
+                    WidgetMetricChart(
+                        data: data,
+                        values: animateOnAppear ? animatedReadings : data.readings,
+                        days: max(7, chartDays),
+                        height: chartHeight,
+                        color: trendColor,
+                        reduceMotion: reduceMotion
+                    )
+                    .frame(width: max(0, geometry.size.width - valueWidth - gap))
+                    .opacity(size == .small ? 0 : 1)
+                    .clipped()
                 }
-                .frame(height: size == .large ? 76 : 64)
             }
+            .frame(height: chartHeight)
         }
-        .padding(PrototypeStyle.cardPadding(for: size))
+        .padding(PrototypeStyle.cardInsets(for: size))
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: size.height, alignment: .topLeading)
         .prototypeWidgetSurface()
@@ -186,7 +186,7 @@ private struct MetricWidgetCard: View {
         .accessibilityIdentifier(identifierOverride ?? data.kind.accessibilityIdentifier)
         .accessibilityLabel(titleOverride ?? data.kind.title)
         .accessibilityValue(accessibilityDescription)
-        .task(id: MotionInput(data: data, size: size, reduceMotion: reduceMotion, enabled: animateOnAppear)) { await animateData() }
+        .task(id: MotionInput(data: data, reduceMotion: reduceMotion, enabled: animateOnAppear)) { await animateData() }
         .onDisappear { hasAppeared = false }
     }
 
@@ -199,7 +199,7 @@ private struct MetricWidgetCard: View {
             }
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(data.formatted(displayedValue))
-                    .font(PrototypeFont.inter(size == .large ? 34 : 31, weight: .medium))
+                    .prototypeInterpolatedFont(size == .large ? 34 : 31, weight: .medium)
                     .tracking(-1.1)
                     .contentTransition(.numericText(value: displayedValue))
                 if let unit = data.displayUnit {
@@ -244,7 +244,6 @@ private struct MetricWidgetCard: View {
 
     private struct MotionInput: Hashable {
         let data: WidgetMetricData
-        let size: PrototypeWidgetSize
         let reduceMotion: Bool
         let enabled: Bool
     }
@@ -261,7 +260,7 @@ private struct WidgetMetricHeader: View {
                 .frame(width: size == .small ? 12 : 16, height: size == .small ? 12 : 16)
                 .accessibilityHidden(true)
             Text(size == .small && title == "Health Overview" ? "HEALTH" : title.uppercased())
-                .font(PrototypeFont.inter(size == .small ? 9 : size == .medium ? 11 : 15))
+                .prototypeInterpolatedFont(size == .small ? 9 : size == .medium ? 11 : 15)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
@@ -316,15 +315,23 @@ private struct WidgetMetricChart: View {
     let reduceMotion: Bool
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: days == 14 ? 4 : 3) {
-            ForEach(14 - days..<14, id: \.self) { index in
-                let reading = values.indices.contains(index) ? values[index] : 0
-                RoundedRectangle(cornerRadius: 2.5)
-                    .fill(index == 13 ? color.opacity(0.5) : PrototypeTheme.foreground.opacity(0.2))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: CGFloat(min(1, max(0, reading / data.maximum))) * height)
-                    .frame(height: height, alignment: .bottom)
-                    .animation(reduceMotion ? nil : .easeOut(duration: 0.65).delay(Double(index - (14 - days)) * 0.045), value: reading)
+        GeometryReader { geometry in
+            let gap: CGFloat = days == 14 ? 4 : 3
+            let width = max(0, (geometry.size.width - gap * CGFloat(days - 1)) / CGFloat(days))
+            HStack(alignment: .bottom, spacing: 0) {
+                ForEach(0..<14, id: \.self) { index in
+                    let visible = index >= 14 - days
+                    let reading = values.indices.contains(index) ? values[index] : 0
+                    RoundedRectangle(cornerRadius: 2.5)
+                        .fill(index == 13 ? color.opacity(0.5) : PrototypeTheme.foreground.opacity(0.2))
+                        .frame(width: width, height: CGFloat(min(1, max(0, reading / data.maximum))) * height)
+                        .frame(height: height, alignment: .bottom)
+                        .animation(reduceMotion ? nil : .easeOut(duration: 0.65).delay(Double(max(0, index - (14 - days))) * 0.045), value: reading)
+                        .opacity(visible ? 1 : 0)
+                        .frame(width: visible ? width : 0, alignment: .trailing)
+                        .clipped()
+                        .padding(.trailing, visible && index < 13 ? gap : 0)
+                }
             }
         }
         .frame(maxWidth: .infinity)
@@ -344,34 +351,39 @@ struct HealthSummaryWidgetCard: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if size == .large {
-                ScrollView(.horizontal) {
-                    HStack(alignment: .top, spacing: 12) {
-                        ForEach(metrics, id: \.kind) { metric in
-                            HealthMetricCircle(data: metric, averageOverride: metric.kind == .blastExposure ? averageExposure : nil, animateOnAppear: animateOnAppear)
-                        }
+        ZStack(alignment: .bottomLeading) {
+            ScrollView(.horizontal) {
+                HStack(alignment: .top, spacing: 12) {
+                    ForEach(metrics, id: \.kind) { metric in
+                        HealthMetricCircle(data: metric, averageOverride: metric.kind == .blastExposure ? averageExposure : nil, animateOnAppear: animateOnAppear)
                     }
-                    .padding(12)
                 }
-                .scrollIndicators(.hidden)
-                .frame(height: size.height)
-                .contentShape(RoundedRectangle(cornerRadius: 16))
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel("Daily health metrics")
-            } else {
-                MetricWidgetCard(
-                    data: .blast(exposure: exposure),
-                    size: size,
-                    animateOnAppear: animateOnAppear,
-                    titleOverride: "Health Overview",
-                    identifierOverride: "health-summary-compact-metric",
-                    averageOverride: averageExposure
-                )
+                .padding(12)
             }
+            .scrollIndicators(.hidden)
+            .frame(height: size.height)
+            .contentShape(RoundedRectangle(cornerRadius: 16))
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Daily health metrics")
+            .opacity(size == .large ? 1 : 0)
+            .allowsHitTesting(size == .large)
+            .accessibilityHidden(size != .large)
+
+            MetricWidgetCard(
+                data: .blast(exposure: exposure),
+                size: size,
+                animateOnAppear: animateOnAppear,
+                titleOverride: "Health Overview",
+                identifierOverride: "health-summary-compact-metric",
+                averageOverride: averageExposure
+            )
+            .opacity(size == .large ? 0 : 1)
+            .allowsHitTesting(size != .large)
+            .accessibilityHidden(size == .large)
         }
         .frame(maxWidth: .infinity)
         .frame(height: size.height)
+        .clipped()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("health-summary-widget")
         .accessibilityLabel("Health Overview")

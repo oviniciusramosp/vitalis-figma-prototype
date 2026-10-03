@@ -2,6 +2,46 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
+/// Use the narrowest natural wrap that retains the available line count.
+/// Text still chooses word boundaries and handles font scaling and VoiceOver.
+struct PrototypeBalancedTextLayout: Layout {
+    struct Cache {
+        var size: CGSize = .zero
+    }
+
+    func makeCache(subviews: Subviews) -> Cache { Cache() }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) -> CGSize {
+        guard let text = subviews.first else { return .zero }
+        let singleLine = text.sizeThatFits(.unspecified)
+        let width = max(1, proposal.width ?? singleLine.width)
+        let natural = text.sizeThatFits(ProposedViewSize(width: width, height: nil))
+        guard natural.height > singleLine.height + 0.5 else {
+            cache.size = natural
+            return natural
+        }
+        var lower: CGFloat = 1
+        var upper = width
+        for _ in 0..<12 {
+            if upper - lower < 0.5 { break }
+            let candidate = (lower + upper) / 2
+            let fit = text.sizeThatFits(ProposedViewSize(width: candidate, height: nil))
+            if fit.height <= natural.height + 0.5 { upper = candidate }
+            else { lower = candidate }
+        }
+        // Round outward so the final placement cannot add an extra line.
+        let balancedWidth = min(width, ceil(upper))
+        cache.size = text.sizeThatFits(ProposedViewSize(width: balancedWidth, height: nil))
+        cache.size.width = balancedWidth
+        return cache.size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) {
+        subviews.first?.place(at: bounds.origin, anchor: .topLeading,
+                             proposal: ProposedViewSize(width: min(bounds.width, cache.size.width), height: nil))
+    }
+}
+
 struct TodayView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.displayScale) private var displayScale
@@ -123,7 +163,7 @@ struct TodayView: View {
                         Color.clear.frame(height: 20 * verticalScale)
 
                         exposureNotice
-                            .frame(height: 68)
+                            .frame(minHeight: 68)
                             .clipped()
 
                         Color.clear.frame(height: 20 * verticalScale)
@@ -281,6 +321,7 @@ struct TodayView: View {
         } else {
             widgetCard(widget)
                 .frame(width: width, height: widget.size.height)
+                .contentShape(Rectangle())
                 .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 16))
                 .contextMenu {
                     Picker("Widget Size", selection: widgetSizeBinding(for: widget)) {
@@ -467,7 +508,10 @@ struct TodayView: View {
         Binding {
             widgetLayout.widgets.first { $0.id == widget.id }?.size ?? widget.size
         } set: { size in
-            changeWidgets { widgetLayout.resize(id: widget.id, to: size) }
+            withAnimation(reduceMotion ? nil : PrototypeStyle.widgetResizeAnimation) {
+                widgetLayout.resize(id: widget.id, to: size)
+            }
+            saveWidgetLayout()
         }
     }
 
@@ -574,11 +618,13 @@ struct TodayView: View {
                 .frame(width: 24, height: 24)
                 .accessibilityHidden(true)
 
-            Text(currentSample.blast >= ExposurePreviewSample.demoPromptThresholdPSI
-                 ? "Your Blast exposure crossed\n4.0 PSI this morning. Complete your tests."
-                 : "Your Blast exposure is below\nyour 14-day average. Check in when ready.")
-                .font(PrototypeFont.inter(size: 15, weight: .medium))
-                .fixedSize(horizontal: false, vertical: true)
+            PrototypeBalancedTextLayout {
+                Text(currentSample.blast >= ExposurePreviewSample.demoPromptThresholdPSI
+                     ? "Your Blast exposure crossed 4.0 PSI this morning. Complete your tests."
+                     : "Your Blast exposure is below your 14-day average. Check in when ready.")
+                    .font(PrototypeFont.inter(size: 15, weight: .medium))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 34)

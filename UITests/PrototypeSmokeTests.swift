@@ -2,6 +2,34 @@ import XCTest
 
 @MainActor
 final class PrototypeSmokeTests: XCTestCase {
+    func testMetricResizingPreservesReadingAndChartWindow() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing", "--reset-theme"]
+        app.launch()
+        let cognition = widget(in: app, identifier: "cognition-widget")
+        XCTAssertTrue(cognition.waitForExistence(timeout: 15))
+        let blast = widget(in: app, identifier: "blast-exposure-card")
+        let fullWidth = blast.frame.width
+
+        for (size, days, fraction) in [("Small", 0, 1.0 / 3), ("Large", 14, 1.0), ("Medium", 7, 0.5)] {
+            reveal(cognition, in: app)
+            changeWidgetSize(cognition, to: size, in: app)
+            expectWidgetValue(cognition, contains: "Value: 50")
+            expectWidgetValue(cognition, contains: "Chart days: \(days)")
+            XCTAssertEqual(cognition.frame.width / fullWidth, fraction, accuracy: 0.04)
+            reveal(cognition, in: app)
+            attachScreenshot(app, name: "Cognition aligned at bottom \(size)")
+        }
+
+        let heart = widget(in: app, identifier: "heart-widget")
+        reveal(heart, in: app)
+        changeWidgetSize(heart, to: "Small", in: app)
+        expectWidgetValue(heart, contains: "Value: 90 bpm")
+        expectWidgetValue(heart, contains: "Chart days: 0")
+        reveal(heart, in: app)
+        attachScreenshot(app, name: "Heart Small aligned at bottom")
+    }
+
     func testDashboardAnimations() {
         let app = XCUIApplication()
         app.launchArguments = ["--preview-motion"]

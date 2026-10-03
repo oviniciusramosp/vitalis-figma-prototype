@@ -73,7 +73,9 @@ Todos os tamanhos de layout são expressos em **pontos**, não pixels CSS. `Prot
 |---|---:|
 | `PrototypeStyle.spacing` | 4, 8, 12, 16, 20, 24, 32, 48 pt |
 | `PrototypeStyle.gridGap` | 12 pt |
-| `PrototypeStyle.cardPadding(for:)` | 16 pt Large; 12 pt Medium e Small |
+| `PrototypeStyle.cardPadding(for:)` | Topo e laterais: 16 pt Large; 12 pt Medium e Small |
+| `PrototypeStyle.cardBottomPadding` | 16 pt em todos os tamanhos |
+| `PrototypeStyle.chartHeight(for:)` | 76 pt Large; 60 pt Medium e Small |
 | `PrototypeStyle.cardRadius` | 16 pt |
 | `PrototypeStyle.cardBorderWidth` | 0,5 pt |
 | `PrototypeStyle.cardBorderOpacity` | Foreground 24% |
@@ -117,7 +119,7 @@ More mantém a mesma textura da Home por trás das linhas agrupadas. A página D
 
 ### Superfície de widget
 
-`.prototypeWidgetSurface()` aplica cor do texto, preenchimento translúcido, raio e borda. `BlastExposureCard` e `MetricWidgetCard` compartilham esse modifier. O padding continua separado e depende do tamanho do widget.
+`.prototypeWidgetSurface()` aplica cor do texto, preenchimento translúcido, raio e borda. `BlastExposureCard` e `MetricWidgetCard` compartilham esse modifier e usam `PrototypeStyle.cardInsets(for:)`. Valores, unidades, tendências e gráficos ficam ancorados na base; o padding inferior é sempre 16 pt. Topo e laterais variam conforme o tamanho.
 
 ### Ação principal — Start
 
@@ -170,6 +172,7 @@ O botão pequeno **Edit Widgets**, ao final da lista, ativa a edição. Cards en
 | Blast Exposure | Barras em cascata, atraso de 0,045 s por coluna; spring com bounce discreto |
 | Demais gráficos | Ease-out de 0,65 s, com atraso por coluna |
 | Valores compactos | Numeric morph com ease-out de 0,7 s |
+| Resize de widget | Spring de 0,52 s, bounce 0,025; fontes interpoladas, valores e colunas com identidade estável |
 | FormSheet | Spring de 0,48 s, bounce 0,09 |
 | Mensagem de exposição | Slide para baixo vindo da região do gauge, blur reduzindo a zero |
 | Catálogo | Replay do gauge real; amostras dos widgets animam ao aparecer |
@@ -177,6 +180,10 @@ O botão pequeno **Edit Widgets**, ao final da lista, ativa a edição. Cards en
 O estado intermediário do gauge fica no próprio componente para evitar atualizar todo o dashboard a cada tick. O fundo usa recursos Metal compartilhados e atualizações sob demanda; o sensor envia parâmetros direto ao renderer, sem reconstruir a árvore SwiftUI a cada frame. O app solicita a cadência máxima disponível; FPS, haptics e resposta ao sensor ainda precisam de avaliação no iPhone físico.
 
 Reduce Motion apresenta os valores diretamente, remove a sequência de entrada e desativa parallax. Preserve essa alternativa ao adicionar animações. Tarefas e haptics devem parar quando a view sai da tela ou o app perde atividade.
+
+A mensagem de exposição usa `PrototypeBalancedTextLayout`: busca a menor largura que mantém a quantidade de linhas natural disponível. O próprio `Text` define as quebras por palavra, respeita a fonte e mantém a leitura acessível. Não insira quebras fixas no conteúdo da mensagem. O bloco cresce com o texto.
+
+Durante o resize, o número continua no mesmo `Text` e as 14 colunas conservam seus IDs; as colunas fora da janela cedem espaço e desaparecem gradualmente. O gráfico compactado desaparece pela largura e opacidade, sem reiniciar a entrada dos dados. Health Overview mantém as duas apresentações e faz crossfade entre o carrossel Large e o resumo compacto.
 
 ## Acessibilidade e dados
 
@@ -214,7 +221,7 @@ ScrollView {
 // Superfície e padding dos widgets existentes.
 Text("Sample value")
     .font(PrototypeFont.inter(34, weight: .medium))
-    .padding(PrototypeStyle.cardPadding(for: .large))
+    .padding(PrototypeStyle.cardInsets(for: .large))
     .prototypeWidgetSurface()
 
 // Ações com os mesmos estilos de Today e do catálogo.

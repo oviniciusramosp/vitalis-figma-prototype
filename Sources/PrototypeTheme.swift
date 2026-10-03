@@ -117,3 +117,24 @@ enum PrototypeFont {
         inter(size, weight: weight)
     }
 }
+
+/// Interpolate the type size along with a widget's geometry during resizing.
+private struct PrototypeInterpolatedFont: AnimatableModifier {
+    var size: CGFloat
+    let weight: Font.Weight
+
+    var animatableData: CGFloat {
+        get { size }
+        set { size = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        content.font(PrototypeFont.inter(size, weight: weight))
+    }
+}
+
+extension View {
+    func prototypeInterpolatedFont(_ size: CGFloat, weight: Font.Weight = .regular) -> some View {
+        modifier(PrototypeInterpolatedFont(size: size, weight: weight))
+    }
+}

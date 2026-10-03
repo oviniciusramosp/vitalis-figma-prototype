@@ -27,7 +27,7 @@ struct BlastExposureCard: View {
 
     private var chartDays: Int { widgetSize == .small ? 0 : widgetSize == .medium ? 7 : 14 }
     private var averageDays: Int { widgetSize == .medium ? 7 : 14 }
-    private var chartHeight: CGFloat { widgetSize == .large ? 76 : 64 }
+    private var chartHeight: CGFloat { PrototypeStyle.chartHeight(for: widgetSize) }
     private var normalizedHeights: [Double] {
         let recent = Array(historyHeights.suffix(14)).map { $0.isFinite ? max(0, $0) : 0 }
         return Array(repeating: 0, count: max(0, 14 - recent.count)) + recent
@@ -45,10 +45,10 @@ struct BlastExposureCard: View {
     private var displayedToday: Double { animateOnAppear ? animatedToday : todayExposure }
     private var history: [ExposureDay] {
         let heights = animateOnAppear ? animatedHeights : normalizedHeights
-        return (14 - chartDays..<14).map { ExposureDay(id: $0, height: heights[$0]) }
+        return (0..<14).map { ExposureDay(id: $0, height: heights[$0]) }
     }
     private var selectedExposure: ExposureDay? {
-        guard let selectedDay else { return nil }
+        guard let selectedDay, chartDays > 0, selectedDay >= 14 - chartDays else { return nil }
         return history.first { $0.id == selectedDay }
     }
     private var latestComparison: ExposureComparison {
@@ -72,42 +72,39 @@ struct BlastExposureCard: View {
                     .frame(width: widgetSize == .small ? 12 : 16, height: widgetSize == .small ? 12 : 16)
                     .accessibilityHidden(true)
                 Text("BLAST EXPOSURE")
-                    .font(PrototypeFont.inter(widgetSize == .small ? 9 : widgetSize == .medium ? 11 : 15))
+                    .prototypeInterpolatedFont(widgetSize == .small ? 9 : widgetSize == .medium ? 11 : 15)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
             .frame(height: widgetSize == .large ? 18 : 16, alignment: .leading)
 
-            if widgetSize == .small {
-                HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    numberValue(displayedToday, fontSize: 31, unitSize: 10)
-                    comparisonArrow
+            GeometryReader { geometry in
+                let valueWidth = widgetSize == .small ? geometry.size.width
+                    : widgetSize == .large ? min(123, geometry.size.width * 0.45) : geometry.size.width * 0.45
+                let gap: CGFloat = widgetSize == .medium ? 6 : 0
+                HStack(alignment: .bottom, spacing: gap) {
+                    average
+                        .frame(width: valueWidth, height: chartHeight, alignment: .bottomLeading)
+                    historyChart
+                        .frame(width: max(0, geometry.size.width - valueWidth - gap))
+                        .opacity(widgetSize == .small ? 0 : 1)
+                        .clipped()
+                        .allowsHitTesting(widgetSize != .small)
+                        .accessibilityHidden(widgetSize == .small)
                 }
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .frame(height: 64, alignment: .center)
-            } else {
-                GeometryReader { geometry in
-                    HStack(alignment: .bottom, spacing: widgetSize == .large ? 0 : 6) {
-                        average
-                            .frame(width: widgetSize == .large ? min(123, geometry.size.width * 0.45) : geometry.size.width * 0.45, alignment: .leading)
-                        historyChart
-                            .frame(maxWidth: .infinity)
-                    }
-                    .overlay(alignment: .top) {
-                        Capsule()
-                            .fill(PrototypeTheme.accent)
-                            .frame(height: 2)
-                            .offset(y: averageLineY(for: displayedAverage) - 1)
-                            .animation(reduceMotion ? nil : .easeOut(duration: 0.7), value: displayedAverage)
-                            .allowsHitTesting(false)
-                            .accessibilityHidden(true)
-                    }
+                .overlay(alignment: .top) {
+                    Capsule()
+                        .fill(PrototypeTheme.accent)
+                        .frame(height: 2)
+                        .offset(y: averageLineY(for: displayedAverage) - 1)
+                        .opacity(widgetSize == .small ? 0 : 1)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
                 }
-                .frame(height: chartHeight)
             }
+            .frame(height: chartHeight)
         }
-        .padding(PrototypeStyle.cardPadding(for: widgetSize))
+        .padding(PrototypeStyle.cardInsets(for: widgetSize))
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: widgetSize.height, alignment: .topLeading)
         .prototypeWidgetSurface()
@@ -116,26 +113,40 @@ struct BlastExposureCard: View {
         .accessibilityLabel("Blast Exposure")
         .accessibilityValue(accessibilityDescription)
         .task(id: animationInput) { await animateData() }
+        .onChange(of: widgetSize) { _, _ in
+            if chartDays == 0 || !(14 - chartDays..<14).contains(selectedDay ?? -1) { selectedDay = nil }
+            withAnimation(reduceMotion ? nil : PrototypeStyle.widgetResizeAnimation) {
+                animatedAverage = rangeAverage
+                animatedToday = todayExposure
+            }
+        }
         .onDisappear { hasAppeared = false }
     }
 
     private var average: some View {
-        GeometryReader { _ in
-            let labelHeight: CGFloat = widgetSize == .large ? 18 : 12
-            VStack(alignment: .leading, spacing: 10) {
-                Text("\(averageDays)-day avg")
-                    .font(PrototypeFont.inter(widgetSize == .large ? 10 : 9))
-                    .foregroundStyle(PrototypeTheme.foreground.opacity(0.6))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .frame(height: labelHeight, alignment: .topLeading)
-                numberValue(displayedAverage, fontSize: widgetSize == .large ? 34 : 28, unitSize: widgetSize == .large ? 14 : 10)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .frame(height: widgetSize == .large ? 41.25 : 34, alignment: .leading)
+        ZStack(alignment: .bottomLeading) {
+            HStack(alignment: .firstTextBaseline, spacing: widgetSize == .small ? 3 : 0) {
+                numberValue(widgetSize == .small ? displayedToday : displayedAverage,
+                            fontSize: widgetSize == .large ? 34 : widgetSize == .medium ? 28 : 31,
+                            unitSize: widgetSize == .large ? 14 : 10)
+                comparisonArrow
+                    .frame(width: widgetSize == .small ? 12 : 0)
+                    .opacity(widgetSize == .small ? 1 : 0)
+                    .clipped()
             }
-            .offset(y: averageLineY(for: rangeAverage) - labelHeight - 5)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.7), value: rangeAverage)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+
+            Text("\(averageDays)-day avg")
+                .prototypeInterpolatedFont(widgetSize == .large ? 10 : 9)
+                .foregroundStyle(PrototypeTheme.foreground.opacity(0.6))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(height: 12, alignment: .topLeading)
+                .frame(maxHeight: .infinity, alignment: .topLeading)
+                .offset(y: max(0, averageLineY(for: rangeAverage) - 17))
+                .opacity(widgetSize == .small ? 0 : 1)
+                .accessibilityHidden(widgetSize == .small)
         }
         .frame(height: chartHeight)
     }
@@ -147,11 +158,11 @@ struct BlastExposureCard: View {
     private func numberValue(_ value: Double, fontSize: CGFloat, unitSize: CGFloat) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 0) {
             Text(psi(value))
-                .font(PrototypeFont.inter(fontSize, weight: .medium))
+                .prototypeInterpolatedFont(fontSize, weight: .medium)
                 .tracking(-1.1)
                 .contentTransition(.numericText(value: value))
             Text("PSI")
-                .font(PrototypeFont.inter(unitSize))
+                .prototypeInterpolatedFont(unitSize)
                 .foregroundStyle(PrototypeTheme.muted)
         }
     }
@@ -175,13 +186,17 @@ struct BlastExposureCard: View {
 
     private var historyChart: some View {
         GeometryReader { geometry in
-            HStack(alignment: .bottom, spacing: widgetSize == .large ? 4 : 3) {
+            let visibleDays = max(7, chartDays)
+            let gap: CGFloat = widgetSize == .large ? 4 : 3
+            let barWidth = max(0, (geometry.size.width - gap * CGFloat(visibleDays - 1)) / CGFloat(visibleDays))
+            HStack(alignment: .bottom, spacing: 0) {
                 ForEach(history) { day in
+                    let visible = day.id >= 14 - visibleDays
                     let isSelected = selectedDay == day.id
                     let tint = day.isToday ? latestComparisonColor : PrototypeTheme.foreground
                     RoundedRectangle(cornerRadius: 3)
                         .fill(tint.opacity(isSelected ? 0.95 : day.isToday ? 0.5 : 0.2))
-                        .frame(maxWidth: .infinity)
+                        .frame(width: barWidth)
                         .frame(height: min(chartHeight, max(0, day.height) / ExposurePreviewSample.chartHeight * chartHeight))
                         .overlay(alignment: .bottom) {
                             Text(day.label)
@@ -195,7 +210,12 @@ struct BlastExposureCard: View {
                         .shadow(color: tint.opacity(isSelected ? 0.35 : 0), radius: 4)
                         .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isSelected)
                         .frame(height: chartHeight, alignment: .bottom)
-                        .animation(reduceMotion ? nil : .spring(duration: 0.72, bounce: 0.08).delay(Double(day.id - (14 - chartDays)) * 0.045), value: day.height)
+                        .animation(reduceMotion ? nil : .spring(duration: 0.72, bounce: 0.08).delay(Double(max(0, day.id - (14 - visibleDays))) * 0.045), value: day.height)
+                        .opacity(visible ? 1 : 0)
+                        .frame(width: visible ? barWidth : 0, alignment: .trailing)
+                        .clipped()
+                        .padding(.trailing, visible && day.id < 13 ? gap : 0)
+                        .accessibilityHidden(!visible)
                         .accessibilityLabel("\(day.longName), \(day.id < 7 ? "previous week" : "this week")")
                         .accessibilityValue("\(psi(readings[day.id])) PSI, simulated reading")
                 }
@@ -293,12 +313,11 @@ struct BlastExposureCard: View {
     }
 
     private var animationInput: AnimationInput {
-        AnimationInput(average: rangeAverage, heights: historyHeights, size: widgetSize, reduceMotion: reduceMotion, enabled: animateOnAppear)
+        AnimationInput(average: averageExposure, heights: historyHeights, reduceMotion: reduceMotion, enabled: animateOnAppear)
     }
     private struct AnimationInput: Hashable {
         let average: Double
         let heights: [Double]
-        let size: PrototypeWidgetSize
         let reduceMotion: Bool
         let enabled: Bool
     }

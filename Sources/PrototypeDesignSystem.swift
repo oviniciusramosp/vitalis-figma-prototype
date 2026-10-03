@@ -7,9 +7,20 @@ enum PrototypeStyle {
     static let cardRadius: CGFloat = 16
     static let cardBorderWidth: CGFloat = 0.5
     static let cardBorderOpacity = 0.24
+    static let cardBottomPadding: CGFloat = 16
+    static let widgetResizeAnimation = Animation.spring(duration: 0.52, bounce: 0.025)
 
     static func cardPadding(for size: PrototypeWidgetSize) -> CGFloat {
         size == .large ? 16 : 12
+    }
+
+    static func cardInsets(for size: PrototypeWidgetSize) -> EdgeInsets {
+        let padding = cardPadding(for: size)
+        return EdgeInsets(top: padding, leading: padding, bottom: cardBottomPadding, trailing: padding)
+    }
+
+    static func chartHeight(for size: PrototypeWidgetSize) -> CGFloat {
+        size == .large ? 76 : 60
     }
 }
 
@@ -201,7 +212,7 @@ struct PrototypeDesignSystemView: View {
                 Rectangle().fill(PrototypeTheme.foreground.opacity(0.28)).frame(height: 1 / max(1, displayScale))
                 Text("Hairline · 1 physical pixel")
                     .font(PrototypeFont.inter(12)).foregroundStyle(PrototypeTheme.muted)
-                Text("Widget radius 16 pt · border 0.5 pt\nGrid gap 12 pt · inner padding 16 / 12 pt")
+                Text("Widget radius 16 pt · border 0.5 pt\nGrid gap 12 pt · bottom padding 16 pt\nTop and sides 16 / 12 pt")
                     .font(PrototypeFont.inter(13))
                     .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
