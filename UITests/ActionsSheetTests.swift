@@ -49,8 +49,12 @@ final class ActionsSheetTests: XCTestCase {
         app.launch()
         let panel = element("native-actions-panel", in: app)
         let scroll = app.scrollViews["today-dashboard-scroll"]
-        let today = app.tabBars.buttons["Today"]
-        let more = app.tabBars.buttons["More"]
+        func tab(_ title: String) -> XCUIElement {
+            let transparent = app.buttons["collapsed-tab-" + title]
+            return transparent.exists ? transparent : app.tabBars.buttons[title]
+        }
+        var today: XCUIElement { tab("Today") }
+        var more: XCUIElement { tab("More") }
         XCTAssertTrue(today.waitForExistence(timeout: 15))
         expect(panel, "Expanded")
         XCTAssertTrue(today.isHittable)
@@ -64,6 +68,14 @@ final class ActionsSheetTests: XCTestCase {
         XCTAssertTrue(more.isHittable)
         XCTAssertFalse(app.buttons["Start cognitive test"].exists)
         screenshot(app, "Native sheet collapsed with tabs visible")
+
+        more.tap()
+        XCTAssertTrue(app.navigationBars["More"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.tabBars.buttons["Today"].isHittable)
+        app.tabBars.buttons["Today"].tap()
+        expect(panel, "Collapsed")
+        XCTAssertTrue(more.isHittable)
+
 
         // The native grabber remains usable while the background is scrolled.
         let origin = app.coordinate(withNormalizedOffset: .zero)

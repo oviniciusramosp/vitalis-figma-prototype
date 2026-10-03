@@ -45,7 +45,6 @@ struct PrototypeRootView: View {
                         rootContent
                             .presentationDetents((selectedTab == .more || selectedDevice != nil) ? [.large] : [.height(100), .height(240)], selection: $nativeDetent)
                             .presentationDragIndicator(.visible)
-                            .presentationBackground(.ultraThinMaterial)
                             .presentationBackgroundInteraction(.enabled)
                             // Preserve the system corner geometry shared by the screen, sheet and tab bar.
                             .interactiveDismissDisabled()
@@ -128,17 +127,24 @@ struct PrototypeRootView: View {
         TabView(selection: activeTabBinding) {
             Tab("Today", systemImage: "text.rectangle.page", value: .today) {
                 if usesNativeSheet {
-                    VStack {
-                        if !actionsCollapsed {
+                    VStack(spacing: 0) {
+                        if actionsCollapsed {
+                            collapsedTabs
+                                .frame(maxHeight: .infinity, alignment: .bottom)
+                                .padding(.horizontal, 8)
+                                .padding(.bottom, 8)
+                        } else {
                             PrototypeActionRows(
                                 onStartTest: { activeSheet = .cognitiveTest },
                                 onReport: { activeSheet = .report }
                             )
                             .padding(.horizontal, 20)
                             .padding(.top, 12)
+                            Spacer(minLength: 0)
                         }
-                        Spacer(minLength: 0)
                     }
+                    // Keep one glass surface when collapsed; restore native tabs on expansion.
+                    .toolbarVisibility(actionsCollapsed ? .hidden : .visible, for: .tabBar)
                     .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("native-actions-panel")
                     .accessibilityValue(actionsCollapsed ? "Collapsed" : "Expanded")
@@ -181,6 +187,41 @@ struct PrototypeRootView: View {
                     .presentationDragIndicator(.visible)
             }
         }
+    }
+
+    /// Transparent controls share the native sheet's glass instead of adding another capsule.
+    private var collapsedTabs: some View {
+        HStack(spacing: 0) {
+            collapsedTab("Today", symbol: "text.rectangle.page", tab: .today)
+            collapsedTab("Exposure", symbol: "dot.radiowaves.left.and.right", tab: .exposure)
+            collapsedTab("Health", symbol: "waveform.path.ecg", tab: .health)
+            collapsedTab("More", symbol: "ellipsis", tab: .more)
+        }
+    }
+
+    private func collapsedTab(_ title: String, symbol: String, tab: PrototypeTab) -> some View {
+        Button {
+            activeTabBinding.wrappedValue = tab
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: symbol)
+                    .font(.system(size: 24))
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold))
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 58)
+            .contentShape(Rectangle())
+            .background {
+                if selectedTab == tab {
+                    Capsule().fill(PrototypeTheme.foreground.opacity(0.12))
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(PrototypeTheme.foreground)
+        .accessibilityIdentifier("collapsed-tab-" + title)
+        .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
     }
 
     private var activeTabBinding: Binding<PrototypeTab> {
