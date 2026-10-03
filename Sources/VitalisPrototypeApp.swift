@@ -50,6 +50,11 @@ struct PrototypeRootView: View {
                 dashboard
                     .sheet(isPresented: $nativeSheetPresented) {
                         rootContent
+                            .background {
+                                PrototypeTheme.panelTint
+                                    .ignoresSafeArea()
+                                    .allowsHitTesting(false)
+                            }
                             .presentationDetents((selectedTab == .more || selectedDevice != nil) ? [.large] : [.height(NativeActionsLayout.collapsedHeight), .height(NativeActionsLayout.expandedHeight)], selection: $nativeDetent)
                             .presentationDragIndicator(.visible)
                             .presentationBackgroundInteraction(.enabled)
