@@ -105,6 +105,20 @@ struct PrototypeActionsSheet: View {
     }
 
     private var actionRows: some View {
+        PrototypeActionRows(onStartTest: onStartTest, onReport: onReport)
+            .opacity(collapsed && dragTranslation == 0 ? 0 : 1)
+            .allowsHitTesting(!collapsed)
+            .accessibilityHidden(collapsed)
+    }
+}
+
+/// Shared contents for the original panel and the native sheet experiment.
+struct PrototypeActionRows: View {
+    let onStartTest: () -> Void
+    let onReport: () -> Void
+    @Environment(\.displayScale) private var displayScale
+
+    var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Image("cognition")
@@ -141,9 +155,6 @@ struct PrototypeActionsSheet: View {
             .padding(.vertical, 12)
         }
         .foregroundStyle(PrototypeTheme.foreground)
-        .opacity(collapsed && dragTranslation == 0 ? 0 : 1)
-        .allowsHitTesting(!collapsed)
-        .accessibilityHidden(collapsed)
     }
 }
 

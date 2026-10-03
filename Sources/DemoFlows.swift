@@ -554,6 +554,7 @@ struct HealthView: View {
 }
 
 struct MoreView: View {
+    @Binding var nativeSheetEnabled: Bool
     let onReset: () -> Void
 
     @State private var appearance = PrototypeAppearance.shared
@@ -591,6 +592,14 @@ struct MoreView: View {
                 .listRowBackground(PrototypeTheme.listRow)
 
                 Section("Developer") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle("Native sheet experiment", isOn: $nativeSheetEnabled)
+                            .accessibilityIdentifier("native-sheet-experiment")
+                        Text("Close and reopen the app to apply this experiment.")
+                            .font(PrototypeFont.inter(12))
+                            .foregroundStyle(PrototypeTheme.muted)
+                    }
+
                     NavigationLink {
                         PrototypeDesignSystemView()
                     } label: {

@@ -21,6 +21,11 @@ private enum PrototypeSheet: String, Identifiable {
 
 struct PrototypeRootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("prototype.native-actions-sheet") private var nativeSheetEnabled = false
+    @State private var nativeSheetSessionEnabled = UserDefaults.standard.bool(forKey: "prototype.native-actions-sheet")
+    @State private var nativeSheetPresented = false
+    @State private var actionsCollapsed = false
+    @State private var nativeDetent: PresentationDetent = .height(240)
     @State private var selectedTab: PrototypeTab = .today
     @State private var activeSheet: PrototypeSheet?
     @State private var selectedDevice: PrototypeDevice?
@@ -28,7 +33,71 @@ struct PrototypeRootView: View {
     @AppStorage("prototype.testCompleted") private var testCompleted = false
     @AppStorage("prototype.reportSubmitted") private var reportSubmitted = false
 
+    private var usesNativeSheet: Bool {
+        nativeSheetSessionEnabled || ProcessInfo.processInfo.arguments.contains("--native-actions-sheet")
+    }
+
     var body: some View {
+        Group {
+            if usesNativeSheet {
+                dashboard
+                    .sheet(isPresented: $nativeSheetPresented) {
+                        rootContent
+                            .presentationDetents((selectedTab == .more || selectedDevice != nil) ? [.large] : [.height(100), .height(240)], selection: $nativeDetent)
+                            .presentationDragIndicator(.visible)
+                            .presentationBackground(.ultraThinMaterial)
+                            .presentationBackgroundInteraction(.enabled)
+                            .presentationCornerRadius(38)
+                            .interactiveDismissDisabled()
+                            .onChange(of: nativeDetent) { _, detent in
+                                if selectedTab == .today { actionsCollapsed = detent == .height(100) }
+                            }
+                    }
+            } else {
+                rootContent
+            }
+        }
+        .preferredColorScheme(PrototypeTheme.colorScheme)
+        .task(id: usesNativeSheet) {
+            nativeSheetPresented = false
+            guard usesNativeSheet else { return }
+            // Let the previous TabView disappear before presenting its replacement.
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else { return }
+            nativeSheetPresented = true
+        }
+        .onChange(of: actionsCollapsed) { _, collapsed in
+            guard usesNativeSheet, selectedTab == .today else { return }
+            withAnimation(.spring(duration: 0.48, bounce: 0.09)) {
+                nativeDetent = .height(collapsed ? 100 : 240)
+            }
+        }
+        .onChange(of: selectedDevice) { _, device in
+            guard usesNativeSheet else { return }
+            nativeDetent = device != nil || selectedTab == .more ? .large : .height(actionsCollapsed ? 100 : 240)
+        }
+        .onChange(of: selectedTab) { _, tab in
+            nativeDetent = tab == .more ? .large : .height(actionsCollapsed ? 100 : 240)
+        }
+    }
+
+    private var dashboard: some View {
+        ZStack {
+            PrototypeBackground().ignoresSafeArea()
+            TodayView(
+                onStartTest: { activeSheet = .cognitiveTest },
+                onReport: { activeSheet = .report },
+                onShowDevices: { activeSheet = .devices },
+                onShowDevice: { selectedDevice = $0 },
+                blastIsSynced: syncedDevices.contains(.blastGauge),
+                watchIsSynced: syncedDevices.contains(.appleWatch),
+                actionsCollapsed: $actionsCollapsed,
+                usesNativeActionsSheet: usesNativeSheet
+            )
+        }
+    }
+
+    private var rootContent: some View {
         ZStack {
             appTabs
                 .allowsHitTesting(selectedDevice == nil)
@@ -58,16 +127,23 @@ struct PrototypeRootView: View {
     private var appTabs: some View {
         TabView(selection: activeTabBinding) {
             Tab("Today", systemImage: "text.rectangle.page", value: .today) {
-                ZStack {
-                    PrototypeBackground().ignoresSafeArea()
-                    TodayView(
-                        onStartTest: { activeSheet = .cognitiveTest },
-                        onReport: { activeSheet = .report },
-                        onShowDevices: { activeSheet = .devices },
-                        onShowDevice: { selectedDevice = $0 },
-                        blastIsSynced: syncedDevices.contains(.blastGauge),
-                        watchIsSynced: syncedDevices.contains(.appleWatch)
-                    )
+                if usesNativeSheet {
+                    VStack {
+                        if !actionsCollapsed {
+                            PrototypeActionRows(
+                                onStartTest: { activeSheet = .cognitiveTest },
+                                onReport: { activeSheet = .report }
+                            )
+                            .padding(.horizontal, 20)
+                            .padding(.top, 12)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("native-actions-panel")
+                    .accessibilityValue(actionsCollapsed ? "Collapsed" : "Expanded")
+                } else {
+                    dashboard
                 }
             }
             Tab("Exposure", systemImage: "dot.radiowaves.left.and.right", value: .exposure) {
@@ -77,7 +153,7 @@ struct PrototypeRootView: View {
                 EmptyView()
             }
             Tab("More", systemImage: "ellipsis", value: .more) {
-                MoreView(onReset: {
+                MoreView(nativeSheetEnabled: $nativeSheetEnabled, onReset: {
                     testCompleted = false
                     reportSubmitted = false
                     selectedTab = .today
@@ -179,6 +255,7 @@ private struct InertTabSelectionGuard: UIViewControllerRepresentable {
                 ?? findTabs(in: root)
                 ?? controller.view.window?.rootViewController.flatMap { findTabs(in: $0) }
             guard let tabs, tabs.delegate !== self else { return }
+            tabs.view.backgroundColor = .clear
             tabController = tabs
             forwardedDelegate = tabs.delegate
             tabs.delegate = self

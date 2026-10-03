@@ -57,7 +57,8 @@ struct TodayView: View {
     @State private var lastReorderTarget: String?
     @State private var widgetDragLifecycle = WidgetDragLifecycle()
     @State private var scrollProgress: CGFloat = 0
-    @State private var actionsCollapsed = false
+    @Binding private var actionsCollapsed: Bool
+    private let usesNativeActionsSheet: Bool
 
     // Keep the original color when SwiftUI bridges this image to the native menu.
     private static let removeWidgetIcon = UIImage(systemName: "minus.circle")?
@@ -76,7 +77,9 @@ struct TodayView: View {
         onShowDevices: @escaping () -> Void,
         onShowDevice: ((PrototypeDevice) -> Void)? = nil,
         blastIsSynced: Bool = false,
-        watchIsSynced: Bool = false
+        watchIsSynced: Bool = false,
+        actionsCollapsed: Binding<Bool> = .constant(false),
+        usesNativeActionsSheet: Bool = false
     ) {
         self.onStartTest = onStartTest
         self.onReport = onReport
@@ -84,6 +87,8 @@ struct TodayView: View {
         self.onShowDevice = onShowDevice ?? { _ in onShowDevices() }
         self.blastIsSynced = blastIsSynced
         self.watchIsSynced = watchIsSynced
+        _actionsCollapsed = actionsCollapsed
+        self.usesNativeActionsSheet = usesNativeActionsSheet
         _ = Self.resetWidgetLayoutForTesting
         _widgetLayout = State(initialValue: .load(defaultWidgets: Self.initialWidgets, persist: Self.persistsWidgetLayout))
     }
@@ -216,13 +221,15 @@ struct TodayView: View {
                         actionsCollapsed = false
                     }
                 }
-                PrototypeActionsSheet(
-                    collapsed: $actionsCollapsed,
-                    height: panelHeight,
-                    bottomInset: geometry.safeAreaInsets.bottom,
-                    onStartTest: onStartTest,
-                    onReport: onReport
-                )
+                if !usesNativeActionsSheet {
+                    PrototypeActionsSheet(
+                        collapsed: $actionsCollapsed,
+                        height: panelHeight,
+                        bottomInset: geometry.safeAreaInsets.bottom,
+                        onStartTest: onStartTest,
+                        onReport: onReport
+                    )
+                }
             }
         }
         .foregroundStyle(PrototypeTheme.foreground)
