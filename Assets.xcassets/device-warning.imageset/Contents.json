@@ -1,5 +1,15 @@
 {
-  "images": [{ "filename": "7478c.svg", "idiom": "universal" }],
-  "info": { "author": "xcode", "version": 1 },
-  "properties": { "preserves-vector-representation": true }
+  "images": [
+    {
+      "filename": "error.svg",
+      "idiom": "universal"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  },
+  "properties": {
+    "preserves-vector-representation": true
+  }
 }

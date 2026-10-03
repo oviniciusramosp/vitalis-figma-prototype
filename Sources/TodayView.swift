@@ -570,9 +570,9 @@ struct TodayView: View {
                     image: "device-two",
                     ring: "device-two-ring",
                     progress: watchRingProgress,
-                    accessibilityLabel: watchIsSynced ? "Apple Watch synced, battery 38 percent, charge recommended" : "Apple Watch, battery 38 percent, last synced 3 hours ago",
+                    accessibilityLabel: watchIsSynced ? "Apple Watch synced, battery 38 percent" : "Apple Watch, battery 38 percent, last synced 3 hours ago",
                     accessibilityIdentifier: "apple-watch-device",
-                    hasWarning: true,
+                    hasWarning: false,
                     warningVisible: showDeviceWarning,
                     onTap: { onShowDevice(.appleWatch) }
                 )
@@ -772,10 +772,11 @@ private struct DeviceStatusButton: View {
 
                 if hasWarning {
                     Image("device-warning")
+                        .renderingMode(.original)
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 12, height: 12)
-                        .background(Circle().fill(.white).frame(width: 10, height: 10))
+                        .frame(width: 14, height: 14)
+                        .background(Circle().fill(.white).frame(width: 12, height: 12))
                         .scaleEffect(warningVisible ? 1 : 0.8)
                         .offset(y: -16)
                         .opacity(warningVisible ? 1 : 0)
@@ -788,6 +789,7 @@ private struct DeviceStatusButton: View {
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityIdentifier(accessibilityIdentifier)
+        .accessibilityValue(hasWarning && warningVisible ? "Synchronization alert" : "No device alert")
         .accessibilityHint("Opens this device's battery and synchronization status")
     }
 

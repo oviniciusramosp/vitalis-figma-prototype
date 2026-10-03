@@ -1,0 +1,6 @@
+Material Symbols Rounded — error
+Copyright Google LLC
+Source: https://github.com/google/material-design-icons
+License: Apache License 2.0 (MaterialSymbols-LICENSE.txt)
+
+Vector outline extracted from the official Google Fonts font with FILL=1, wght=500, GRAD=200, opsz=24. Colored #FF383C for the prototype. SwiftUI supplies the white backing behind the exclamation cutout.

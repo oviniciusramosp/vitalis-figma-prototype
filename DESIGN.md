@@ -151,9 +151,9 @@ O gauge central não tem ícone de alerta. Alertas de sincronização ficam nos 
 
 ### FormSheet e baterias
 
-`PrototypeActionsSheet` tem duas posições de repouso. O scroll dispara a mudança de posição com histerese; o painel não acompanha continuamente cada pixel do scroll. O handler permite arraste manual e ajuste acessível. Dividers de um pixel físico separam as ações.
+`PrototypeActionsSheet` é um painel customizado em SwiftUI com material nativo, mantendo as tabs acima dele. Tem duas posições de repouso. O scroll dispara a mudança de posição com histerese; o painel não acompanha continuamente cada pixel do scroll. O handler permite arraste manual e ajuste acessível. Dividers de um pixel físico separam as ações.
 
-Os dois indicadores de bateria entram em cascata. O alerta de dispositivo surge depois do gauge de bateria e tem borda da cor do fundo. Cada device abre seu próprio modal, com último sync e ação de sincronização simulada.
+Os dois indicadores de bateria entram em cascata. Por padrão, apenas o Blast Gauge apresenta alerta de sincronização; o Apple Watch aparece sem badge. O alerta surge depois do gauge de bateria e tem borda da cor do fundo. Usa o ícone `error` do Material Symbols Rounded, com FILL 1, weight 500, GRAD 200 e optical size 24, apresentado em 14 pt. O círculo é vermelho e recebe fundo branco para a exclamação. O vetor e a licença estão incluídos no projeto; a fonte completa não é necessária em execução. Cada device abre seu próprio modal, com último sync e ação de sincronização simulada.
 
 ### Edição do grid
 

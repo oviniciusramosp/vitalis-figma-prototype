@@ -63,6 +63,9 @@ final class DashboardUXTests: XCTestCase {
         let blastButton = app.buttons["blast-gauge-device"]
         let watchButton = app.buttons["apple-watch-device"]
         XCTAssertTrue(blastButton.waitForExistence(timeout: 15))
+        expectValue(blastButton, contains: "Synchronization alert")
+        expectValue(watchButton, contains: "No device alert")
+        screenshot(app, name: "Default device badges: Blast only")
         let watchCenter = CGPoint(x: watchButton.frame.midX, y: watchButton.frame.midY)
         let exposureTab = app.tabBars.buttons["Exposure"]
         let exposureTabCenter = CGPoint(x: exposureTab.frame.midX, y: exposureTab.frame.midY)
@@ -97,6 +100,8 @@ final class DashboardUXTests: XCTestCase {
         app.buttons["device-done"].tap()
         expectGone(blastModal)
         expectLabel(blastButton, contains: "Blast Gauge synced, battery")
+        expectValue(blastButton, contains: "No device alert")
+        expectValue(watchButton, contains: "No device alert")
         expectLabel(watchButton, contains: "last synced 3 hours ago")
 
         watchButton.tap()
