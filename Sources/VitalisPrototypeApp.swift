@@ -47,7 +47,7 @@ struct PrototypeRootView: View {
                             .presentationDragIndicator(.visible)
                             .presentationBackground(.ultraThinMaterial)
                             .presentationBackgroundInteraction(.enabled)
-                            .presentationCornerRadius(38)
+                            // Preserve the system corner geometry shared by the screen, sheet and tab bar.
                             .interactiveDismissDisabled()
                             .onChange(of: nativeDetent) { _, detent in
                                 if selectedTab == .today { actionsCollapsed = detent == .height(100) }

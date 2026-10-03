@@ -29,8 +29,11 @@ struct PrototypeActionsSheet: View {
     private var position: CGFloat {
         min(travel, max(0, (collapsed ? travel : 0) + dragTranslation))
     }
-    private var panelShape: UnevenRoundedRectangle {
-        UnevenRoundedRectangle(topLeadingRadius: 38, topTrailingRadius: 38)
+    private var panelShape: ConcentricRectangle {
+        ConcentricRectangle(
+            uniformTopCorners: .fixed(38),
+            uniformBottomCorners: .concentric
+        )
     }
 
     var body: some View {
