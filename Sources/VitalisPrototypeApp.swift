@@ -50,7 +50,7 @@ struct PrototypeRootView: View {
                 dashboard
                     .sheet(isPresented: $nativeSheetPresented) {
                         rootContent
-                            .presentationDetents((selectedTab == .more || selectedDevice != nil) ? [.large] : [.height(NativeActionsLayout.collapsedHeight), .height(NativeActionsLayout.expandedHeight)], selection: $nativeDetent)
+                            .presentationDetents(selectedTab == .more ? [.large] : [.height(NativeActionsLayout.collapsedHeight), .height(NativeActionsLayout.expandedHeight)], selection: $nativeDetent)
                             .presentationDragIndicator(.visible)
                             .presentationBackgroundInteraction(.enabled)
                             // Preserve the system corner geometry shared by the screen, sheet and tab bar.
@@ -83,10 +83,6 @@ struct PrototypeRootView: View {
                 nativeDetent = .height(collapsed ? NativeActionsLayout.collapsedHeight : NativeActionsLayout.expandedHeight)
             }
         }
-        .onChange(of: selectedDevice) { _, device in
-            guard usesNativeSheet else { return }
-            nativeDetent = device != nil || selectedTab == .more ? .large : .height(actionsCollapsed ? NativeActionsLayout.collapsedHeight : NativeActionsLayout.expandedHeight)
-        }
         .onChange(of: selectedTab) { _, tab in
             nativeDetent = tab == .more ? .large : .height(actionsCollapsed ? NativeActionsLayout.collapsedHeight : NativeActionsLayout.expandedHeight)
         }
@@ -109,30 +105,30 @@ struct PrototypeRootView: View {
     }
 
     private var rootContent: some View {
+        appTabs
+            .preferredColorScheme(PrototypeTheme.colorScheme)
+    }
+
+    private func deviceModal(_ device: PrototypeDevice) -> some View {
         ZStack {
-            appTabs
-                .allowsHitTesting(selectedDevice == nil)
-                .accessibilityHidden(selectedDevice != nil)
+            PrototypeBackdropBlur(progress: 1, style: PrototypeTheme.blurStyle)
+                .overlay(Color.black.opacity(0.28))
+                .accessibilityHidden(true)
 
-            if let device = selectedDevice {
-                PrototypeBackdropBlur(progress: 1, style: PrototypeTheme.blurStyle)
-                    .overlay(Color.black.opacity(0.28))
-                    .ignoresSafeArea()
-                    .accessibilityHidden(true)
-
-                PrototypeDeviceDetailView(
-                    device: device,
-                    isSynced: syncedDevices.contains(device),
-                    onSync: { syncedDevices.insert(device) },
-                    onDismiss: { selectedDevice = nil }
-                )
-                .padding(.horizontal, 24)
-                .transition(.scale(scale: 0.96).combined(with: .opacity))
-                .zIndex(1)
-            }
+            PrototypeDeviceDetailView(
+                device: device,
+                isSynced: syncedDevices.contains(device),
+                onSync: { syncedDevices.insert(device) },
+                onDismiss: { selectedDevice = nil }
+            )
+            .padding(.horizontal, 24)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea()
         .preferredColorScheme(PrototypeTheme.colorScheme)
-        .animation(reduceMotion ? nil : .spring(duration: 0.3, bounce: 0.04), value: selectedDevice)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("device-modal-overlay")
+        .presentationBackground(.clear)
     }
 
     private var appTabs: some View {
@@ -182,6 +178,9 @@ struct PrototypeRootView: View {
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
             }
+        }
+        .fullScreenCover(item: $selectedDevice) { device in
+            deviceModal(device)
         }
     }
 

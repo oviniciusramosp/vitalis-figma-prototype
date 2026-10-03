@@ -105,6 +105,44 @@ final class ActionsSheetTests: XCTestCase {
         expect(panel, "Expanded")
     }
 
+    func testDeviceModalCoversScreenAndPreservesNativeSheetPosition() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--native-actions-sheet", "--preview-motion", "--reset-theme"]
+        app.launch()
+        let panel = element("native-actions-panel", in: app)
+        let blast = app.buttons["blast-gauge-device"]
+        XCTAssertTrue(blast.waitForExistence(timeout: 15))
+        XCTAssertTrue(panel.waitForExistence(timeout: 5))
+        expect(panel, "Expanded")
+        let initialPanelFrame = panel.frame
+        blast.tap()
+        let overlay = element("device-modal-overlay", in: app)
+        let modal = element("device-detail-blastGauge", in: app)
+        XCTAssertTrue(modal.waitForExistence(timeout: 5))
+        XCTAssertEqual(overlay.frame.minY, app.frame.minY, accuracy: 2)
+        XCTAssertEqual(overlay.frame.maxY, app.frame.maxY, accuracy: 2)
+        XCTAssertEqual(modal.frame.midY, app.frame.midY, accuracy: 2)
+        XCTAssertFalse(app.buttons["collapsed-tab-More"].isHittable)
+        screenshot(app, "Blast Gauge modal covers dashboard sheet and tabs")
+        app.buttons["device-ignore"].tap()
+        XCTAssertTrue(blast.waitForExistence(timeout: 5))
+        expect(panel, "Expanded")
+        XCTAssertEqual(panel.frame.minY, initialPanelFrame.minY, accuracy: 2)
+
+        app.scrollViews["today-dashboard-scroll"].swipeUp()
+        expect(panel, "Collapsed")
+        let collapsedPanelFrame = panel.frame
+        blast.tap()
+        XCTAssertTrue(modal.waitForExistence(timeout: 5))
+        app.buttons["device-sync-now"].tap()
+        XCTAssertTrue(app.buttons["device-done"].waitForExistence(timeout: 10))
+        app.buttons["device-done"].tap()
+        XCTAssertTrue(blast.waitForExistence(timeout: 5))
+        expect(panel, "Collapsed")
+        XCTAssertEqual(panel.frame.minY, collapsedPanelFrame.minY, accuracy: 2)
+        XCTAssertTrue(app.buttons["collapsed-tab-More"].isHittable)
+    }
+
     func testNativeSheetCanBeEnabledAndDisabledFromMore() {
         let app = XCUIApplication()
         app.launchArguments = ["--preview-motion", "--reset-theme"]
