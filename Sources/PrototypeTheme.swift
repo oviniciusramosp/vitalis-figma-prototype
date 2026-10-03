@@ -86,6 +86,14 @@ enum PrototypeTheme {
         case .light: Color(white: 0.55).opacity(0.14)
         }
     }
+    /// Counter the bright native glass with a persistent tint behind sheet content.
+    static var nativePanelTint: Color {
+        switch selection {
+        case .gray: .black.opacity(0.32)
+        case .dark: .black.opacity(0.24)
+        case .light: Color(white: 0.55).opacity(0.18)
+        }
+    }
     static var modalTint: Color {
         selection == .light ? Color.white.opacity(0.60) : Color.black.opacity(0.60)
     }

@@ -50,11 +50,6 @@ struct PrototypeRootView: View {
                 dashboard
                     .sheet(isPresented: $nativeSheetPresented) {
                         rootContent
-                            .background {
-                                PrototypeTheme.panelTint
-                                    .ignoresSafeArea()
-                                    .allowsHitTesting(false)
-                            }
                             .presentationDetents((selectedTab == .more || selectedDevice != nil) ? [.large] : [.height(NativeActionsLayout.collapsedHeight), .height(NativeActionsLayout.expandedHeight)], selection: $nativeDetent)
                             .presentationDragIndicator(.visible)
                             .presentationBackgroundInteraction(.enabled)
@@ -208,30 +203,31 @@ struct PrototypeRootView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 12)
                     .frame(maxHeight: .infinity, alignment: .top)
-                    .opacity(expansion)
+                    .offset(y: (1 - expansion) * 24)
+                    .opacity(pow(expansion, 1.6))
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.42), value: expansion)
                     .allowsHitTesting(!actionsCollapsed)
                     .accessibilityHidden(actionsCollapsed)
                 }
-                .clipped()
                 .overlay(alignment: .bottom) {
                     sheetTabs
                         .background {
-                            ConcentricRectangle(
-                                uniformTopCorners: .fixed(NativeActionsLayout.tabHeight / 2),
-                                uniformBottomCorners: .concentric
-                            )
+                            Capsule()
                                 .fill(.clear)
-                                .glassEffect(.regular, in: ConcentricRectangle(
-                                    uniformTopCorners: .fixed(NativeActionsLayout.tabHeight / 2),
-                                    uniformBottomCorners: .concentric
-                                ))
-                                .opacity(expansion * 0.35)
+                                .glassEffect(.regular, in: Capsule())
+                                .opacity(min(1, expansion * 3))
+                                .animation(reduceMotion ? nil : .easeInOut(duration: 0.55), value: expansion)
                                 .allowsHitTesting(false)
                         }
                         .padding(tabInset)
                         // Expanded sheets include the home-indicator safe area in their glass.
                         // Follow that inset continuously, without moving the collapsed controls.
                         .offset(y: geometry.safeAreaInsets.bottom * expansion)
+                }
+                .background {
+                    PrototypeTheme.nativePanelTint
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
                 }
         }
     }
