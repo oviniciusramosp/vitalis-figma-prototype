@@ -178,15 +178,10 @@ private struct MetricWidgetCard: View {
                 .frame(height: size == .large ? 76 : 64)
             }
         }
-        .padding(size == .large ? 16 : 12)
+        .padding(PrototypeStyle.cardPadding(for: size))
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: size.height, alignment: .topLeading)
-        .foregroundStyle(PrototypeTheme.foreground)
-        .background(PrototypeTheme.surface, in: RoundedRectangle(cornerRadius: 16))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(PrototypeTheme.foreground.opacity(0.24), lineWidth: 0.5)
-        }
+        .prototypeWidgetSurface()
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(identifierOverride ?? data.kind.accessibilityIdentifier)
         .accessibilityLabel(titleOverride ?? data.kind.title)

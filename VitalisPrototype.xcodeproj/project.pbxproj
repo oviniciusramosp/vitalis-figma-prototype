@@ -13,6 +13,7 @@
 		393FB87D4E014AEA66A5B94A /* PrototypeActionsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 807EAA09F25C18F89E07D7F6 /* PrototypeActionsSheet.swift */; };
 		3BA5D363D25B50133096084F /* ThemeAndTabsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69E5E3F837F3ACAED83C874C /* ThemeAndTabsTests.swift */; };
 		4D944E10DBD5655EB9007F46 /* ChartSelectionGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FB69103C393FBFF83158086 /* ChartSelectionGesture.swift */; };
+		52AC7063FBE34097D145921B /* PrototypeDesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB9DCAEE1A70D46AA357A0AC /* PrototypeDesignSystem.swift */; };
 		54707273814FB235A84064E5 /* DashboardUXTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 399C5AF31492E7C810E4F582 /* DashboardUXTests.swift */; };
 		5AA5C98B2DA853F6FE59D7F9 /* PrototypeWidgetLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79234FB867C1058D0B59BA14 /* PrototypeWidgetLayout.swift */; };
 		5B80CD2BB43AC56B5F1CAE42 /* ExposurePreviewSample.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC36307FCC7D441FF01FCBD7 /* ExposurePreviewSample.swift */; };
@@ -34,6 +35,7 @@
 		DC9C067AF745167979BDD8D4 /* WidgetOrderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F2192FF2ABC9CA14CFE0569 /* WidgetOrderingTests.swift */; };
 		E9617ACCE8A53E65B0585895 /* PrototypeTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E1A1E3EC8F5A8AE267566A /* PrototypeTheme.swift */; };
 		F83225419C70884DE7C8DE0B /* PrototypeWidgetGridEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1FEAA42EC4C6922F6D4555D /* PrototypeWidgetGridEditing.swift */; };
+		FE3B6963C3DA30F3AE732286 /* DesignSystemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5397B77D6D01870FE1D292F /* DesignSystemTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -53,7 +55,7 @@
 		273D43C432CC7BFB1595A2E3 /* BlastExposureCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlastExposureCard.swift; sourceTree = "<group>"; };
 		28E1A1E3EC8F5A8AE267566A /* PrototypeTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrototypeTheme.swift; sourceTree = "<group>"; };
 		307D42E329F63D809F2673D4 /* PrototypeBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrototypeBackground.swift; sourceTree = "<group>"; };
-		34DC3BC637FD6F2C3D227C42 /* VitalisPrototype.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VitalisPrototype.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		34DC3BC637FD6F2C3D227C42 /* VitalisPrototype.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = VitalisPrototype.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		399C5AF31492E7C810E4F582 /* DashboardUXTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardUXTests.swift; sourceTree = "<group>"; };
 		3A19A068048C7DDBB6BD9F82 /* ActionsSheetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionsSheetTests.swift; sourceTree = "<group>"; };
 		43BC1B2B8138DF558B83EEA3 /* VitalisPrototypeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitalisPrototypeApp.swift; sourceTree = "<group>"; };
@@ -76,6 +78,8 @@
 		BC36307FCC7D441FF01FCBD7 /* ExposurePreviewSample.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExposurePreviewSample.swift; sourceTree = "<group>"; };
 		C80F2BAE9FAC8AB676C2E684 /* Inter.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Inter.ttf; sourceTree = "<group>"; };
 		D50F20984C117A40E2276E95 /* BlastGaugeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlastGaugeView.swift; sourceTree = "<group>"; };
+		DB9DCAEE1A70D46AA357A0AC /* PrototypeDesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrototypeDesignSystem.swift; sourceTree = "<group>"; };
+		F5397B77D6D01870FE1D292F /* DesignSystemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystemTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -84,6 +88,7 @@
 			children = (
 				3A19A068048C7DDBB6BD9F82 /* ActionsSheetTests.swift */,
 				399C5AF31492E7C810E4F582 /* DashboardUXTests.swift */,
+				F5397B77D6D01870FE1D292F /* DesignSystemTests.swift */,
 				1BA8B86F45D516BCAC2E4E46 /* PrototypeSmokeTests.swift */,
 				69E5E3F837F3ACAED83C874C /* ThemeAndTabsTests.swift */,
 				4C6A44BB7BD6FFB16694C493 /* WidgetGridEditingTests.swift */,
@@ -141,6 +146,7 @@
 				BC36307FCC7D441FF01FCBD7 /* ExposurePreviewSample.swift */,
 				807EAA09F25C18F89E07D7F6 /* PrototypeActionsSheet.swift */,
 				307D42E329F63D809F2673D4 /* PrototypeBackground.swift */,
+				DB9DCAEE1A70D46AA357A0AC /* PrototypeDesignSystem.swift */,
 				64C4A9BDA3E24CE132AB211C /* PrototypeDeviceDetails.swift */,
 				8B5D5CF7F3B840EBC1BD52C2 /* PrototypeMesh.metal */,
 				143C1AA93EFC2BC37D19D1B5 /* PrototypeMetricCards.swift */,
@@ -251,6 +257,7 @@
 			files = (
 				1BF4BB686D53D62C8A32BD98 /* ActionsSheetTests.swift in Sources */,
 				54707273814FB235A84064E5 /* DashboardUXTests.swift in Sources */,
+				FE3B6963C3DA30F3AE732286 /* DesignSystemTests.swift in Sources */,
 				CFD87DC79FCFD2D3A335314D /* PrototypeSmokeTests.swift in Sources */,
 				3BA5D363D25B50133096084F /* ThemeAndTabsTests.swift in Sources */,
 				812FA0BD39CF975211C15972 /* WidgetGridEditingTests.swift in Sources */,
@@ -271,6 +278,7 @@
 				5B80CD2BB43AC56B5F1CAE42 /* ExposurePreviewSample.swift in Sources */,
 				393FB87D4E014AEA66A5B94A /* PrototypeActionsSheet.swift in Sources */,
 				8BBC1F6812B890D9E96F2DFA /* PrototypeBackground.swift in Sources */,
+				52AC7063FBE34097D145921B /* PrototypeDesignSystem.swift in Sources */,
 				0195234BB126A63E30D6659B /* PrototypeDeviceDetails.swift in Sources */,
 				70847F3B856EC49EBD25C1D4 /* PrototypeMesh.metal in Sources */,
 				6A78A0C95596CC33AB2F5C8D /* PrototypeMetricCards.swift in Sources */,

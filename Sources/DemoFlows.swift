@@ -590,6 +590,28 @@ struct MoreView: View {
                 }
                 .listRowBackground(PrototypeTheme.listRow)
 
+                Section("Developer") {
+                    NavigationLink {
+                        PrototypeDesignSystemView()
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "square.stack.3d.up")
+                                .foregroundStyle(PrototypeTheme.success)
+                                .frame(width: 24)
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text("Design System")
+                                    .foregroundStyle(PrototypeTheme.foreground)
+                                Text("Styles, components and motion")
+                                    .font(PrototypeFont.inter(12))
+                                    .foregroundStyle(PrototypeTheme.muted)
+                            }
+                        }
+                        .padding(.vertical, 5)
+                    }
+                    .accessibilityIdentifier("open-design-system")
+                }
+                .listRowBackground(PrototypeTheme.listRow)
+
                 Section("About") {
                     LabeledContent("Version", value: "Prototype 1.0")
                     LabeledContent("Data", value: "Sample data")
@@ -611,8 +633,9 @@ struct MoreView: View {
                 .listRowBackground(PrototypeTheme.listRow)
             }
             .scrollContentBackground(.hidden)
-            .background(PrototypeTheme.background)
+            .background { PrototypeBackground() }
             .navigationTitle("More")
+            .toolbarBackground(.hidden, for: .navigationBar)
             .font(PrototypeFont.inter(15))
             .accessibilityIdentifier("more-screen")
             .alert("Reset this demo session?", isPresented: $confirmReset) {

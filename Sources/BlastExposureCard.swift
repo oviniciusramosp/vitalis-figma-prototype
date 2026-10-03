@@ -107,15 +107,10 @@ struct BlastExposureCard: View {
                 .frame(height: chartHeight)
             }
         }
-        .padding(widgetSize == .large ? 16 : 12)
+        .padding(PrototypeStyle.cardPadding(for: widgetSize))
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: widgetSize.height, alignment: .topLeading)
-        .foregroundStyle(PrototypeTheme.foreground)
-        .background(PrototypeTheme.surface, in: RoundedRectangle(cornerRadius: 16))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(PrototypeTheme.foreground.opacity(0.24), lineWidth: 0.5)
-        }
+        .prototypeWidgetSurface()
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("blast-exposure-card")
         .accessibilityLabel("Blast Exposure")
